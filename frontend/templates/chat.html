@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Support Assistant</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background-color: #f4f4f9; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+        }
+        #chat-container { 
+            width: 100%; 
+            max-width: 500px; 
+            background: white; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+            display: flex; 
+            flex-direction: column; 
+            height: 80vh; 
+            overflow: hidden;
+        }
+        #chat-history { 
+            flex-grow: 1; 
+            padding: 15px; 
+            overflow-y: auto; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+        }
+        .message { 
+            padding: 10px 15px; 
+            border-radius: 15px; 
+            max-width: 80%; 
+            line-height: 1.4; 
+            word-wrap: break-word;
+        }
+        .user-msg { 
+            background-color: #007bff; 
+            color: white; 
+            align-self: flex-end; 
+            border-bottom-right-radius: 2px; 
+        }
+        .ai-msg { 
+            background-color: #e9ecef; 
+            color: black; 
+            align-self: flex-start; 
+            border-bottom-left-radius: 2px; 
+        }
+        .tool-msg { 
+            background-color: #ffeeba; 
+            color: #856404; 
+            align-self: flex-start; 
+            font-size: 0.85em; 
+            border-radius: 8px; 
+            padding: 8px 12px; 
+        }
+        #input-area { 
+            display: flex; 
+            padding: 10px; 
+            background: #fff; 
+            border-top: 1px solid #ddd; 
+        }
+        #user-input { 
+            flex-grow: 1; 
+            padding: 10px; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+            outline: none; 
+        }
+        #send-btn { 
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 10px 15px; 
+            margin-left: 10px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+        }
+        #send-btn:hover { 
+            background-color: #0056b3; 
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="chat-history">
+            <div class="message ai-msg">Hello! I am your AI Support Assistant. How can I help you today?</div>
+        </div>
+        <div id="input-area">
+            <input type="text" id="user-input" placeholder="Type your message here..." onkeypress="handleKeyPress(event)">
+            <button id="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const chatHistory = document.getElementById("chat-history");
+        const userInput = document.getElementById("user-input");
+        
+        // Hardcoded company name for testing purposes
+        const COMPANY_NAME = "public"; 
+
+        function appendMessage(text, senderType) {
+            const msgDiv = document.createElement("div");
+            msgDiv.classList.add("message", senderType);
+            msgDiv.innerText = text;
+            chatHistory.appendChild(msgDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // 1. Display the user's message
+            appendMessage(text, "user-msg");
+            userInput.value = "";
+
+            // 2. Prepare the payload for FastAPI
+            const payload = {
+                message: text,
+                user_company: COMPANY_NAME
+            };
+
+            try {
+                // 3. Send POST request to our backend
+                const response = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                // 4. Handle the response based on the status
+                if (data.status === "success") {
+                    appendMessage(data.reply, "ai-msg");
+                } 
+                else if (data.status === "tool_executed") {
+                    // Show what the AI decided to do
+                    appendMessage(`[System Action]: ${data.ai_action}`, "tool-msg");
+                    
+                    // Display the raw result from the tool
+                    let resultText = "Action completed.";
+                    if (data.rag_result) resultText = JSON.stringify(data.rag_result, null, 2);
+                    if (data.database_result) resultText = JSON.stringify(data.database_result, null, 2);
+                    if (data.web_result) resultText = JSON.stringify(data.web_result, null, 2);
+                    if (data.report_result) resultText = JSON.stringify(data.report_result, null, 2);
+                    
+                    appendMessage(`[Tool Result]:\n${resultText}`, "ai-msg");
+                } 
+                else {
+                    appendMessage(`[Error]: ${data.message}`, "ai-msg");
+                }
+
+            } catch (error) {
+                appendMessage("[System Error] Failed to connect to the server.", "ai-msg");
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") {
+                sendMessage();
+            }
+        }
+    </script>
+</body>
+</html>
