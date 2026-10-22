@@ -1,56 +1,76 @@
-import os
 import sys
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pathlib import Path
 
-# Ensure backend directory is in the path to import rag module
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pypdf import PdfReader
+
+# Ensure the backend directory is in the path to import rag modules.
+BASE_DIR = Path(__file__).resolve().parents[1]
+sys.path.append(str(BASE_DIR))
 from rag.vector_db import save_chunks_to_db
 
-# Define the directory where playbook files will be stored
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DOCS_DIR = os.path.join(BASE_DIR, "data", "playbooks")
+DOCS_DIR = BASE_DIR / "data" / "playbooks"
+SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
+
+
+def load_playbook(file_path: Path) -> list[Document]:
+    """Load a PDF, plain text, or Markdown playbook."""
+    if file_path.suffix.lower() == ".pdf":
+        reader = PdfReader(str(file_path))
+        return [
+            Document(
+                page_content=page.extract_text() or "",
+                metadata={"source": file_path.name, "page": page_number},
+            )
+            for page_number, page in enumerate(reader.pages, start=1)
+        ]
+
+    text = file_path.read_text(encoding="utf-8-sig")
+    return [Document(page_content=text, metadata={"source": file_path.name})]
+
 
 def ingest_documents(company_name="True Digital Group (Demo)"):
-    """Reads PDF and TXT files, splits them into chunks, and saves to ChromaDB."""
-    if not os.path.exists(DOCS_DIR):
-        os.makedirs(DOCS_DIR)
+    """Read playbooks, split them into chunks, and save them to ChromaDB."""
+    if not DOCS_DIR.exists():
+        DOCS_DIR.mkdir(parents=True)
         print(f"[Info] Created directory at {DOCS_DIR}. Please place your playbook files there.")
         return
 
-    files = [f for f in os.listdir(DOCS_DIR) if f.endswith(('.pdf', '.txt'))]
+    files = sorted(
+        path for path in DOCS_DIR.iterdir()
+        if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS
+    )
     if not files:
-        print(f"[Warning] No supported files (.pdf, .txt) found in {DOCS_DIR}.")
+        print(f"[Warning] No supported files (.pdf, .txt, .md) found in {DOCS_DIR}.")
         return
 
-    # Initialize text splitter for optimal LLM context window size
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200,
-        separators=["\n\n", "\n", ".", " ", ""]
+        separators=["\n\n", "\n", ".", " ", ""],
     )
 
-    for filename in files:
-        file_path = os.path.join(DOCS_DIR, filename)
-        print(f"[Process] Loading and chunking: {filename}...")
-        
+    for file_path in files:
+        print(f"[Process] Loading and chunking: {file_path.name}...")
         try:
-            if filename.endswith(".pdf"):
-                loader = PyPDFLoader(file_path)
-            elif filename.endswith(".txt"):
-                loader = TextLoader(file_path, encoding="utf-8")
-            
-            docs = loader.load()
-            chunks = text_splitter.split_documents(docs)
-            
-            # Extract raw text from LangChain Document objects
+            docs = load_playbook(file_path)
+            chunks = text_splitter.split_documents(
+                [doc for doc in docs if doc.page_content.strip()]
+            )
             chunk_texts = [chunk.page_content for chunk in chunks]
-            
-            # Save into ChromaDB using the existing function
-            save_chunks_to_db(chunks=chunk_texts, source_url=filename, user_company=company_name)
-            
-        except Exception as e:
-            print(f"[Error] Failed to process {filename}: {str(e)}")
+            if not chunk_texts:
+                print(f"[Warning] No extractable text found in {file_path.name}.")
+                continue
+
+            save_chunks_to_db(
+                chunks=chunk_texts,
+                source_url=file_path.name,
+                user_company=company_name,
+            )
+        except Exception as exc:
+            print(f"[Error] Failed to process {file_path.name}: {exc}")
+
 
 if __name__ == "__main__":
     print("--- Starting Playbook Ingestion ---")
