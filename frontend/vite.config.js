@@ -4,10 +4,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true, // รองรับการเปิดผ่าน Cloud Shell Web Preview
+    host: '0.0.0.0', // Crucial for Google Cloud Shell
     port: 5173,
     proxy: {
-      '/api': 'http://127.0.0.1:8080', // ส่ง /api ไปหา FastAPI อัตโนมัติ
-    },
-  },
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        secure: false
+      }
+    }
+  }
 })

@@ -1,9 +1,10 @@
-from sqlalchemy.orm import Session
-from core.database import SessionLocal, engine
-from models.models import Base, Customer, User, Category, Ticket, KnowledgeArticle
+import os
+import uuid
+from datetime import datetime, timezone
 from passlib.context import CryptContext
+from core.database import SessionLocal
+from models.models import Company, Team, SLAPolicy, TicketCategory, User, PriorityEnum
 
-# Password hasher
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def get_password_hash(password):
@@ -11,65 +12,86 @@ def get_password_hash(password):
 
 def seed_data():
     db = SessionLocal()
-    
-    # Check if data already exists to prevent duplication
-    if db.query(Customer).first():
-        print("⚠️ Data already exists. Skipping seed.")
+    try:
+        # เช็กว่ามีข้อมูลอยู่แล้วหรือยัง
+        if db.query(Company).first():
+            print("Seed data already exists. Skipping initialization.")
+            return
+
+        print("Generating seed data...")
+
+        # 1. Create Company
+        comp = Company(
+            company_code="TDG",
+            company_name="True Digital Group",
+            industry="Cybersecurity",
+            support_tier="Enterprise"
+        )
+        db.add(comp)
+        db.commit()
+        db.refresh(comp)
+
+        # 2. Create SLA Policies (อัปเดตให้ตรงกับระบบ Time to Own/Resolve)
+        sla_p1 = SLAPolicy(
+            name="P1 - Critical",
+            priority=PriorityEnum.P1,
+            time_to_own_minutes=15,
+            time_to_resolve_minutes=240
+        )
+        sla_p2 = SLAPolicy(
+            name="P2 - High",
+            priority=PriorityEnum.P2,
+            time_to_own_minutes=30,
+            time_to_resolve_minutes=480
+        )
+        db.add_all([sla_p1, sla_p2])
+        db.commit()
+        db.refresh(sla_p1)
+        db.refresh(sla_p2)
+
+        # 3. Create Teams
+        team_siem = Team(
+            team_code="SEC-SIEM",
+            team_name="SIEM Operations",
+            description="Cybersecurity and SIEM Alerts"
+        )
+        db.add(team_siem)
+        db.commit()
+        db.refresh(team_siem)
+
+        # 4. Create Ticket Categories (ล็อกค่า Default Impact/Urgency/Priority ให้ตรง Enum)
+        cat_sec = TicketCategory(
+            category_code="SEC-INC-01",
+            ticket_type="INCIDENT",
+            main_category="Security",
+            sub_category="SIEM Alert",
+            default_impact="EXTENSIVE",
+            default_urgency="CRITICAL",
+            default_priority="P1"
+        )
+        db.add(cat_sec)
+        db.commit()
+
+        # 5. Create Admin User
+        admin_user = User(
+            company_id=comp.id,
+            name="Admin Thasanawalai",
+            email="admin@truedigital.com",
+            password_hash=get_password_hash("Admin@1234"),
+            role="ADMIN",
+            job_title="System Administrator",
+            availability_status="ONLINE"
+        )
+        db.add(admin_user)
+        db.commit()
+
+        print("✅ Seed data generated successfully!")
+
+    except Exception as e:
+        print(f"❌ Error generating seed data: {e}")
+        db.rollback()
+    finally:
         db.close()
-        return
-
-    print("Seeding data...")
-
-    # 1. Create Customers
-    cust1 = Customer(company_name="Demeter ICT", contact_email="contact@demeterict.com", sla_plan="Premium")
-    cust2 = Customer(company_name="ABC Corp", contact_email="contact@abccorp.com", sla_plan="Standard")
-    db.add_all([cust1, cust2])
-    db.commit()
-
-    # 2. Create Users (Default password is '123456')
-    admin = User(email="admin@soc.com", password_hash=get_password_hash("123456"), role="ADMIN")
-    agent = User(email="agent@soc.com", password_hash=get_password_hash("123456"), role="SUPPORT_AGENT")
-    client1 = User(email="client@demeterict.com", password_hash=get_password_hash("123456"), role="CUSTOMER", customer_id=cust1.id)
-    db.add_all([admin, agent, client1])
-    db.commit()
-
-    # 3. Create Categories
-    cat_net = Category(name="Network", description="VPN, Wi-Fi, LAN issues")
-    cat_sec = Category(name="Security", description="Malware, Phishing, Access Control")
-    db.add_all([cat_net, cat_sec])
-    db.commit()
-
-    # 4. Create Knowledge Articles
-    kb1 = KnowledgeArticle(title="How to fix VPN Error 809", content="1. Check internet connection.\n2. Restart VPN client.", category_id=cat_net.id)
-    kb2 = KnowledgeArticle(title="Ransomware Response", content="Isolate the host immediately and notify Tier 2.", category_id=cat_sec.id)
-    db.add_all([kb1, kb2])
-    db.commit()
-
-    # 5. Create Mock Tickets
-    t1 = Ticket(
-        subject="CrowdStrike malware alert on Server 01",
-        description="Detected Ransomware on SRV-PROD-01. Host isolated.",
-        priority="1 - Critical",
-        status="OPEN",
-        customer_id=cust1.id,
-        created_by=client1.id,
-        category_id=cat_sec.id
-    )
-    t2 = Ticket(
-        subject="Cannot connect to Corporate VPN",
-        description="Getting Error 809 when trying to connect.",
-        priority="3 - Normal",
-        status="IN_PROGRESS",
-        customer_id=cust1.id,
-        created_by=client1.id,
-        assigned_to=agent.id,
-        category_id=cat_net.id
-    )
-    db.add_all([t1, t2])
-    db.commit()
-
-    print("✅ Mock data seeded successfully!")
-    db.close()
 
 if __name__ == "__main__":
     seed_data()
