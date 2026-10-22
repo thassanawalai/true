@@ -1,155 +1,143 @@
 import os
-import json
-import google.generativeai as genai
+
+from google import genai
+from google.genai import types
 from sqlalchemy.orm import Session
+
 from models.models import Ticket
 from rag.vector_db import search_knowledge
 from services.ticket_service import create_ticket_from_ai
 
-# 1. Initialize Gemini API
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
-# 2. Define Tools using Gemini's Schema format
-soc_tools = [
-    {
-        "function_declarations": [
-            {
-                "name": "search_documents",
-                "description": "Use this tool to search the internal security knowledge base, SOC playbooks, or incident response guides.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "query": {"type": "STRING", "description": "The search keyword."}
-                    },
-                    "required": ["query"]
-                }
+SYSTEM_PROMPT = """You are an AI Support Assistant for a Security Operations Center (SOC).
+Respond in the same language as the user. Be concise and professional.
+For incident triage, ask only one focused question at a time. Use search_documents
+for questions about response procedures. Never claim a ticket was created unless
+create_new_ticket returns a successful ticket number. Escalate critical incidents.
+Use only information returned by tools when describing playbook or ticket data."""
+
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+COMPANY_NAME = "True Digital Group (Demo)"
+
+TOOLS = [
+    types.Tool(function_declarations=[
+        types.FunctionDeclaration(
+            name="search_documents",
+            description="Search internal SOC playbooks for incident response guidance.",
+            parameters_json_schema={
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
             },
-            {
-                "name": "get_ticket_status",
-                "description": "Check the current status of an existing security incident ticket.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "ticket_id": {"type": "STRING", "description": "The unique ticket number or ID."}
-                    },
-                    "required": ["ticket_id"]
-                }
+        ),
+        types.FunctionDeclaration(
+            name="create_new_ticket",
+            description="Create a database ticket for a security incident requiring SOC follow-up.",
+            parameters_json_schema={
+                "type": "object",
+                "properties": {"issue_description": {"type": "string"}},
+                "required": ["issue_description"],
             },
-            {
-                "name": "create_new_ticket",
-                "description": "CRITICAL: Use this tool to open a new security incident ticket.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "issue_description": {"type": "STRING", "description": "A clear description of the security incident."}
-                    },
-                    "required": ["issue_description"]
-                }
+        ),
+        types.FunctionDeclaration(
+            name="get_ticket_status",
+            description="Look up a ticket by its INC number.",
+            parameters_json_schema={
+                "type": "object",
+                "properties": {"ticket_id": {"type": "string"}},
+                "required": ["ticket_id"],
             },
-            {
-                "name": "get_user_tickets",
-                "description": "List all recent tickets in the system when the user asks 'What are my tickets?'.",
-                "parameters": {
-                    "type": "OBJECT",
-                    "properties": {}
-                }
-            }
-        ]
-    }
+        ),
+        types.FunctionDeclaration(
+            name="get_user_tickets",
+            description="List the latest tickets in this demo system.",
+            parameters_json_schema={"type": "object", "properties": {}},
+        ),
+    ])
 ]
 
-def generate_ai_response(user_message: str, db: Session) -> dict:
-    system_prompt = """
-    You are an elite AI Support Assistant for a Security Operations Center (SOC).
-    Your primary responsibility is to facilitate security operations with precision, utmost professionalism, and proactive incident response.
 
-    Strict Operating Guidelines:
-    1. CONCISE RESPONSE: Be extremely concise and direct. Use short paragraphs. Hide complex internal analysis from the user. NEVER omit critical security warnings.
-    2. GUIDED TROUBLESHOOTING (ONE STEP AT A TIME): NEVER ask a list of 3-5 questions at once. Ask ONLY ONE logical question at a time. Adapt your first question based on the specific incident type (e.g., for EDR failures, ask about the OS or error codes; for logins, ask for user verification).
-    3. AUTONOMOUS TOOL EXECUTION: If a user's request matches a tool's capability, YOU MUST CALL THE TOOL IMMEDIATELY. NEVER ask "Should I search the playbook?". Just execute it.
-    4. INCIDENT TRIAGE & ESCALATION: Guide the user step-by-step. If an incident is critical or the user denies the action, advise immediate containment and utilize `create_new_ticket`.
-    5. DATA INTEGRITY: Do not invent or hallucinate data. Base responses strictly on verified tool outputs.
-    6. TONE: Maintain a formal, objective, and professional tone. Respond in the exact same language as the user's prompt.
-    """
-
-    try:
-        model = genai.GenerativeModel(
-            model_name="gemini-3.5-flash-lite",
-            tools=soc_tools,
-            system_instruction=system_prompt
+def _run_tool(name: str, args: dict, db: Session) -> str:
+    if name == "search_documents":
+        results = search_knowledge(
+            query=args.get("query", ""), user_company=COMPANY_NAME, k=3
+        )
+        if not results:
+            return "No relevant playbook passages were found."
+        return "Relevant playbook passages:\n\n" + "\n---\n".join(
+            doc.page_content for doc in results
         )
 
-        chat = model.start_chat()
-        
-        # Step 1: Send user message to Gemini
-        response = chat.send_message(user_message)
-        
-        # Step 2: Intercept Tool Call if Gemini decides to use one
-        if response.parts and response.parts[0].function_call:
-            function_call = response.parts[0].function_call
-            tool_name = function_call.name
-            
-            # Extract arguments
-            arguments = type(function_call).to_dict(function_call).get('args', {})
-            tool_result_content = ""
-            
-            # Step 3: Execute Database/RAG Logic
-            if tool_name == "get_user_tickets":
-                recent_tickets = db.query(Ticket).order_by(Ticket.created_at.desc()).limit(5).all()
-                if recent_tickets:
-                    ticket_lines = [f"- {t.ticket_number}: {t.subject} (Status: {t.status}, Priority: {t.priority})" for t in recent_tickets]
-                    tool_result_content = "Here are the recent tickets:\n" + "\n".join(ticket_lines)
-                else:
-                    tool_result_content = "No tickets found."
-
-            elif tool_name == "get_ticket_status":
-                ticket_id = arguments.get("ticket_id", "")
-                ticket = db.query(Ticket).filter(Ticket.ticket_number.ilike(f"%{ticket_id}%")).first()
-                if ticket:
-                    tool_result_content = f"Ticket {ticket.ticket_number} ('{ticket.subject}') is currently marked as {ticket.status}."
-                else:
-                    tool_result_content = f"Could not find any ticket matching ID: {ticket_id}."
-            
-            elif tool_name == "create_new_ticket":
-                tool_result_content = "System instruction: Please instruct the user to use the 'Create Ticket' button in the UI to ensure accurate Impact and Urgency matrix calculation."
-                
-            elif tool_name == "search_documents":
-                search_query = arguments.get("query", "")
-                rag_results = search_knowledge(query=search_query, user_company="True Digital Group (Demo)")
-                if rag_results:
-                    extracted_texts = [doc.page_content for doc in rag_results]
-                    tool_result_content = "Found relevant playbook information:\n\n" + "\n---\n".join(extracted_texts)
-                else:
-                    tool_result_content = "No relevant playbook documents found for this query in the knowledge base."
-            elif tool_name == "create_new_ticket":
-                issue_description = arguments.get("issue_description", "No description provided.")
-                
-                ticket_result = create_ticket_from_ai(db=db, issue_description=issue_description)
-                
-                if ticket_result.get("success"):
-                    ticket_no = ticket_result["ticket_number"]
-                    priority = ticket_result["priority"]
-                    tool_result_content = f"Successfully created ticket {ticket_no} with {priority} priority. The SOC team has been notified."
-                else:
-                    error_msg = ticket_result.get("error")
-                    tool_result_content = f"Failed to create ticket due to database error: {error_msg}. Please contact support directly."
-
-            # Step 4: Feed the tool result back to Gemini to get the final human-readable response
-            response = chat.send_message(
-                {
-                    "function_response": {
-                        "name": tool_name,
-                        "response": {"result": tool_result_content}
-                    }
-                }
+    if name == "create_new_ticket":
+        result = create_ticket_from_ai(db, args.get("issue_description", "Incident reported by user."))
+        if result["success"]:
+            return (
+                f"Ticket {result['ticket_number']} created successfully. "
+                f"Priority: {result['priority']}; status: OPEN."
             )
-            
-            return {"status": "success", "reply": response.text}
-            
-        else:
-            # Normal conversational response without tools
-            return {"status": "success", "reply": response.text}
-            
-    except Exception as e:
-        print(f"[DEBUG] Gemini Error: {str(e)}")
-        return {"status": "error", "reply": f"Gemini AI Engine Error: {str(e)}"}
+        return f"Ticket creation failed: {result['error']}"
+
+    if name == "get_ticket_status":
+        ticket_id = args.get("ticket_id", "").strip()
+        ticket = db.query(Ticket).filter(Ticket.ticket_number == ticket_id).first()
+        if not ticket:
+            return f"No ticket found for {ticket_id}."
+        return f"{ticket.ticket_number}: {ticket.subject}; status {ticket.status}; priority {ticket.priority.value}."
+
+    if name == "get_user_tickets":
+        tickets = db.query(Ticket).order_by(Ticket.created_at.desc()).limit(5).all()
+        if not tickets:
+            return "There are no tickets yet."
+        return "Recent tickets:\n" + "\n".join(
+            f"{t.ticket_number}: {t.subject} ({t.status}, {t.priority.value})" for t in tickets
+        )
+
+    return f"Unsupported tool: {name}"
+
+
+def generate_ai_response(user_message: str, db: Session, history: list[dict] | None = None) -> dict:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return {"status": "error", "reply": "GEMINI_API_KEY is not configured."}
+
+    client = genai.Client(api_key=api_key)
+    contents = [
+        types.Content(
+            role="model" if item["role"] == "assistant" else "user",
+            parts=[types.Part(text=item["content"])],
+        )
+        for item in (history or [])
+        if item.get("content", "").strip()
+    ]
+    contents.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
+    config = types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT, tools=TOOLS)
+
+    try:
+        for _ in range(3):
+            response = client.models.generate_content(
+                model=MODEL_NAME, contents=contents, config=config
+            )
+            candidate = response.candidates[0]
+            calls = [part.function_call for part in candidate.content.parts if part.function_call]
+            if not calls:
+                return {"status": "success", "reply": response.text or "ขออภัย ระบบยังไม่มีคำตอบในขณะนี้"}
+
+            contents.append(candidate.content)
+            function_responses = []
+            for call in calls:
+                result = _run_tool(call.name, dict(call.args or {}), db)
+                function_responses.append(
+                    types.Part(
+                        function_response=types.FunctionResponse(
+                            name=call.name,
+                            response={"result": result},
+                            id=call.id,
+                        )
+                    )
+                )
+            contents.append(types.Content(role="user", parts=function_responses))
+
+        return {"status": "error", "reply": "The assistant exceeded the tool-call limit for this turn."}
+    except Exception as exc:
+        print(f"[Gemini] {type(exc).__name__}: {exc}")
+        return {"status": "error", "reply": f"Gemini request failed: {exc}"}
