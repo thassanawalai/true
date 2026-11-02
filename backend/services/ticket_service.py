@@ -61,10 +61,22 @@ def create_ticket_from_ai(
     subject: str | None = None,
     impact: ImpactEnum | None = None,
     urgency: UrgencyEnum | None = None,
+    company_id=None,
+    requester_id=None,
 ) -> dict:
     """Create a demo incident with the required foreign keys and SLA policy."""
     try:
-        company, requester, category = _get_demo_records(db)
+        if company_id is None or requester_id is None:
+            return {"success": False, "error": "Authenticated requester required"}
+        company = db.query(Company).filter(Company.id == company_id).first()
+        requester = db.query(User).filter(User.id == requester_id, User.company_id == company_id).first()
+        if not company or not requester:
+            return {"success": False, "error": "Invalid requester/company"}
+        category = db.query(TicketCategory).filter(TicketCategory.name == "Security Incident").first()
+        if not category:
+            category = TicketCategory(name="Security Incident")
+            db.add(category)
+            db.flush()
         description = issue_description.strip() or "Security incident reported via AI assistant."
         upper = description.upper()
         critical_terms = ("RANSOMWARE", "MALWARE", "BREACH", "EXFILTRATION", "EDR", "CRITICAL")
@@ -103,7 +115,7 @@ def create_ticket_from_ai(
             impact=impact,
             urgency=urgency,
             priority=priority,
-            status="OPEN",
+            status="NEW",
             created_at=datetime.utcnow(),
         )
         db.add(ticket)
