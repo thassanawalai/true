@@ -206,20 +206,19 @@ const Tickets = ({ user }) => {
                                         onChange={handleStatusChange}
                                         className="w-full sm:w-64 border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-blue-500"
                                     >
-                                        <option value="NEW">NEW (Unassigned)</option>
                                         <option value="NEW">NEW</option>
                                         <option value="IN_PROGRESS">IN PROGRESS</option>
                                         <option value="RESOLVED">RESOLVED (Stop SLA Timer)</option>
-                                        <option value="CLOSED">CLOSED</option>
+                                        <option value="PENDING">PENDING</option>
                                     </select>
                                 </div>
                                 
                                 {/* ปุ่ม Assign to Me จะโชว์ก็ต่อเมื่อตั๋วยังไม่มีใครรับงาน */}
-                                {!selectedTicket.assignee_id && (
+                                {user?.role !== "CUSTOMER" && !selectedTicket.assignee_id && (
                                     <button 
                                         onClick={async () => {
                                             try {
-                                                await assignTicket(selectedTicket.id, "00000000-0000-0000-0000-000000000000"); // ส่ง dummy ID ให้ backend ไปหาตัว Support ให้อัตโนมัติ
+                                                await assignTicket(selectedTicket.id, user.id); // ส่ง dummy ID ให้ backend ไปหาตัว Support ให้อัตโนมัติ
                                                 fetchTickets();
                                                 setSelectedTicket(null); // ปิด modal
                                             } catch (err) {
