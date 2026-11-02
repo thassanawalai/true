@@ -5,6 +5,7 @@ from google.genai import types
 from sqlalchemy.orm import Session
 
 from models.models import Ticket
+from core.demo_auth import internal
 from rag.vector_db import search_knowledge
 from services.ticket_service import create_ticket_from_ai
 
@@ -57,10 +58,10 @@ TOOLS = [
 ]
 
 
-def _run_tool(name: str, args: dict, db: Session) -> str:
+def _run_tool(name: str, args: dict, db: Session, user) -> str:
     if name == "search_documents":
         results = search_knowledge(
-            query=args.get("query", ""), user_company=COMPANY_NAME, k=3
+            query=args.get("query", ""), user_company=str(user.company_id), k=3
         )
         if not results:
             return "No relevant playbook passages were found."
@@ -69,23 +70,23 @@ def _run_tool(name: str, args: dict, db: Session) -> str:
         )
 
     if name == "create_new_ticket":
-        result = create_ticket_from_ai(db, args.get("issue_description", "Incident reported by user."))
-        if result["success"]:
-            return (
-                f"Ticket {result['ticket_number']} created successfully. "
-                f"Priority: {result['priority']}; status: OPEN."
-            )
-        return f"Ticket creation failed: {result['error']}"
+        return "Please use the Create Ticket form to confirm ticket creation."
 
     if name == "get_ticket_status":
         ticket_id = args.get("ticket_id", "").strip()
-        ticket = db.query(Ticket).filter(Ticket.ticket_number == ticket_id).first()
+        query = db.query(Ticket).filter(Ticket.ticket_number == ticket_id)
+        if not internal(user):
+            query = query.filter(Ticket.company_id == user.company_id)
+        ticket = query.first()
         if not ticket:
             return f"No ticket found for {ticket_id}."
         return f"{ticket.ticket_number}: {ticket.subject}; status {ticket.status}; priority {ticket.priority.value}."
 
     if name == "get_user_tickets":
-        tickets = db.query(Ticket).order_by(Ticket.created_at.desc()).limit(5).all()
+        query = db.query(Ticket)
+        if not internal(user):
+            query = query.filter(Ticket.company_id == user.company_id)
+        tickets = query.order_by(Ticket.created_at.desc()).limit(5).all()
         if not tickets:
             return "There are no tickets yet."
         return "Recent tickets:\n" + "\n".join(
@@ -95,7 +96,9 @@ def _run_tool(name: str, args: dict, db: Session) -> str:
     return f"Unsupported tool: {name}"
 
 
-def generate_ai_response(user_message: str, db: Session, history: list[dict] | None = None) -> dict:
+def generate_ai_response(user_message: str, db: Session, history: list[dict] | None = None, user=None) -> dict:
+    if user is None:
+        return {"status": "error", "reply": "Login required"}
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         return {"status": "error", "reply": "GEMINI_API_KEY is not configured."}
@@ -125,7 +128,7 @@ def generate_ai_response(user_message: str, db: Session, history: list[dict] | N
             contents.append(candidate.content)
             function_responses = []
             for call in calls:
-                result = _run_tool(call.name, dict(call.args or {}), db)
+                result = _run_tool(call.name, dict(call.args or {}), db, user)
                 function_responses.append(
                     types.Part(
                         function_response=types.FunctionResponse(
