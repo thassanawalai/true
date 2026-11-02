@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import Literal
-from routers import tickets, demo_auth, customer_data
+from routers import tickets, demo_auth, customer_data, customer_chat
 from core.dependencies import get_db
 from core.demo_auth import current_user
 from core.database import Base, engine
@@ -21,6 +21,7 @@ app = FastAPI(title="SOC AI Support Assistant API", lifespan=lifespan)
 app.include_router(demo_auth.router)
 app.include_router(tickets.router)
 app.include_router(customer_data.router)
+app.include_router(customer_chat.router)
 # Vite proxies /api locally; explicit cross-origin access is disabled by default.
 
 class ChatMessage(BaseModel):
