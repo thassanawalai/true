@@ -3,7 +3,7 @@ import { getTickets, createTicket, updateTicketStatus, assignTicket } from '../s
 import { Plus, X, Clock, AlertCircle } from 'lucide-react';
 import { UserCircle } from 'lucide-react';
 
-const Tickets = () => {
+const Tickets = ({ user }) => {
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -11,9 +11,7 @@ const Tickets = () => {
     
     const [formData, setFormData] = useState({
         subject: '',
-        description: '',
-        impact: 'MODERATE',
-        urgency: 'MEDIUM'
+        description: ''
     });
 
     const fetchTickets = async () => {
@@ -34,13 +32,9 @@ const Tickets = () => {
     const handleCreateSubmit = async (e) => {
         e.preventDefault();
         try {
-            await createTicket({
-                ...formData,
-                category_id: "00000000-0000-0000-0000-000000000000",
-                company_id: "00000000-0000-0000-0000-000000000000"
-            });
+            await createTicket(formData);
             setIsCreateModalOpen(false);
-            setFormData({ subject: '', description: '', impact: 'MODERATE', urgency: 'MEDIUM' });
+            setFormData({ subject: '', description: '' });
             fetchTickets(); 
         } catch (error) {
             console.error("Error creating ticket:", error);
@@ -68,7 +62,7 @@ const Tickets = () => {
     return (
         <div className="p-6 relative h-full">
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-slate-800">All Tickets</h2>
+                <h2 className="text-2xl font-bold text-slate-800">{user?.role === "CUSTOMER" ? "My Company Tickets" : "All Tickets"}</h2>
                 <button 
                     onClick={() => setIsCreateModalOpen(true)}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition shadow-sm"
@@ -157,34 +151,6 @@ const Tickets = () => {
                                     placeholder="Provide additional details..."
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Impact</label>
-                                    <select 
-                                        value={formData.impact}
-                                        onChange={(e) => setFormData({...formData, impact: e.target.value})}
-                                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none bg-white"
-                                    >
-                                        <option value="EXTENSIVE">EXTENSIVE</option>
-                                        <option value="SIGNIFICANT">SIGNIFICANT</option>
-                                        <option value="MODERATE">MODERATE</option>
-                                        <option value="MINOR">MINOR</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Urgency</label>
-                                    <select 
-                                        value={formData.urgency}
-                                        onChange={(e) => setFormData({...formData, urgency: e.target.value})}
-                                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none bg-white"
-                                    >
-                                        <option value="CRITICAL">CRITICAL</option>
-                                        <option value="HIGH">HIGH</option>
-                                        <option value="MEDIUM">MEDIUM</option>
-                                        <option value="LOW">LOW</option>
-                                    </select>
-                                </div>
-                            </div>
                             <div className="pt-4 flex justify-end gap-2">
                                 <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition">Cancel</button>
                                 <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">Create Ticket</button>
@@ -236,13 +202,12 @@ const Tickets = () => {
                             <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-2">Update Ticket Status</label>
-                                    <select 
-                                        value={selectedTicket.status}
+                                    <select disabled={user?.role === "CUSTOMER"} value={selectedTicket.status}
                                         onChange={handleStatusChange}
                                         className="w-full sm:w-64 border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-blue-500"
                                     >
                                         <option value="NEW">NEW (Unassigned)</option>
-                                        <option value="OPEN">OPEN</option>
+                                        <option value="NEW">NEW</option>
                                         <option value="IN_PROGRESS">IN PROGRESS</option>
                                         <option value="RESOLVED">RESOLVED (Stop SLA Timer)</option>
                                         <option value="CLOSED">CLOSED</option>
