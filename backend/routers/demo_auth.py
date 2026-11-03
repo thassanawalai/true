@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from core.dependencies import get_db
-from core.demo_auth import issue_token, current_user
-from models.models import User, Company
+from core.demo_auth import issue_token, current_user, internal
+from models.models import User, Company, RoleEnum
 
 router = APIRouter(prefix="/api/demo-auth", tags=["Demo Login"])
 
@@ -32,3 +32,12 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
 @router.get("/me")
 def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
     return public_user(user, db.query(Company).filter(Company.id == user.company_id).first())
+
+
+@router.get("/companies")
+def customer_companies(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if not internal(user):
+        raise HTTPException(403, "Support role required")
+    companies = (db.query(Company).join(User).filter(User.role == RoleEnum.CUSTOMER,
+                 Company.name != "Internal SOC (Demo)").distinct().order_by(Company.name).all())
+    return [{"id": str(company.id), "name": company.name} for company in companies]

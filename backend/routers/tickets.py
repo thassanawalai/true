@@ -8,6 +8,7 @@ from core.demo_auth import current_user, internal, visible_ticket
 from models.models import Ticket, User, RoleEnum
 from schemas.ticket import TicketResponse, TicketStatusUpdate
 from services.ticket_service import create_ticket_from_ai
+from routers.customer_data import authorized_company
 
 router = APIRouter(prefix="/api/tickets", tags=["Tickets"])
 class TicketInput(BaseModel):
@@ -17,10 +18,11 @@ class AssignTicketRequest(BaseModel):
     assignee_id: UUID | None = None
 
 @router.get("/", response_model=list[TicketResponse])
-def get_tickets(db: Session = Depends(get_db), user: User = Depends(current_user)):
+def get_tickets(company_id: UUID | None = None, db: Session = Depends(get_db), user: User = Depends(current_user)):
     query = db.query(Ticket)
-    if not internal(user):
-        query = query.filter(Ticket.company_id == user.company_id)
+    if company_id is not None or not internal(user):
+        cid = authorized_company(db, user, company_id)
+        query = query.filter(Ticket.company_id == cid)
     return query.order_by(Ticket.created_at.desc()).all()
 
 @router.post("/", response_model=TicketResponse)

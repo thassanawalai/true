@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 import time
+from uuid import UUID
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 from core.dependencies import get_db
@@ -33,7 +34,7 @@ def current_user(authorization: str | None = Header(default=None), db: Session =
         payload = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
         if int(payload["exp"]) <= time.time():
             raise ValueError("Expired")
-        user = db.query(User).filter(User.id == payload["uid"]).first()
+        user = db.query(User).filter(User.id == UUID(payload["uid"])).first()
         if not user:
             raise ValueError("Unknown user")
         return user

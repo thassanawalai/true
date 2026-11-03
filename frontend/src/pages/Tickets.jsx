@@ -1,74 +1,84 @@
-import React, { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getTickets, createTicket, updateTicketStatus, assignTicket } from '../services/api';
 import { Plus, X, Clock, AlertCircle } from 'lucide-react';
 import { UserCircle } from 'lucide-react';
+import { TicketChatHistory } from '../components/PrivateChat';
 
-const Tickets = ({ user }) => {
+const Tickets = ({ user, companyId }) => {
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [saving, setSaving] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState(null);
-    
+
     const [formData, setFormData] = useState({
         subject: '',
         description: ''
     });
 
-    const fetchTickets = async () => {
+    const fetchTickets = useCallback(async (signal) => {
         try {
-            const data = await getTickets();
+            const data = await getTickets(companyId, signal);
             setTickets(data);
         } catch (error) {
-            console.error("Error fetching tickets:", error);
+            if (error.name !== "AbortError") setError(error.message);
         } finally {
-            setLoading(false);
+            if (!signal?.aborted) setLoading(false);
         }
-    };
+    }, [companyId]);
 
     useEffect(() => {
-        fetchTickets();
-    }, []);
+        const controller = new AbortController();
+        getTickets(companyId, controller.signal)
+            .then(setTickets)
+            .catch(error => { if (error.name !== "AbortError") setError(error.message); })
+            .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+        return () => controller.abort();
+    }, [companyId]);
 
     const handleCreateSubmit = async (e) => {
         e.preventDefault();
+        if (saving) return;
+        setSaving(true); setError('');
         try {
             await createTicket(formData);
             setIsCreateModalOpen(false);
             setFormData({ subject: '', description: '' });
-            fetchTickets(); 
+            fetchTickets();
         } catch (error) {
-            console.error("Error creating ticket:", error);
-            alert(`Failed to create ticket:\n\n${error.message}`);
-        }
+            setError(error.message);
+        } finally { setSaving(false); }
     };
 
     const handleStatusChange = async (e) => {
         const newStatus = e.target.value;
-        if (!selectedTicket) return;
-        
+        if (!selectedTicket || saving) return;
+        setSaving(true); setError('');
+
         try {
             await updateTicketStatus(selectedTicket.id, newStatus);
             // Update the local state to reflect the change immediately
             setSelectedTicket({ ...selectedTicket, status: newStatus });
             fetchTickets();
         } catch (error) {
-            console.error("Error updating status:", error);
-            alert(`Failed to update status:\n\n${error.message}`);
-        }
+            setError(error.message);
+        } finally { setSaving(false); }
     };
 
-    if (loading) return <div className="p-6 text-slate-500">Loading data...</div>;
+    if (loading) return <div role="status" className="p-6 text-slate-500">Loading tickets…</div>;
 
     return (
         <div className="p-6 relative h-full">
+            {error && <p role="alert" className="text-red-700 mb-4">{error} <button onClick={() => { setError(''); setLoading(true); fetchTickets(); }}>Reload tickets</button></p>}
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-slate-800">{user?.role === "CUSTOMER" ? "My Company Tickets" : "All Tickets"}</h2>
-                <button 
+                <h2 className="text-2xl font-bold text-slate-800">{user?.role === "CUSTOMER" ? "My Company Tickets" : "Company Tickets"}</h2>
+                {user.role === "CUSTOMER" && <button
                     onClick={() => setIsCreateModalOpen(true)}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition shadow-sm"
                 >
                     <Plus className="w-4 h-4" /> Create Ticket
-                </button>
+                </button>}
             </div>
 
             {/* Ticket List Table */}
@@ -85,12 +95,12 @@ const Tickets = ({ user }) => {
                     <tbody className="divide-y divide-slate-100">
                         {tickets.length === 0 ? (
                             <tr>
-                                <td colSpan="4" className="py-8 text-center text-slate-500 text-sm">No tickets found in the system</td>
+                                <td colSpan="4" className="py-8 text-center text-slate-500 text-sm">{error ? "Tickets could not be loaded." : "No tickets found for this company."}</td>
                             </tr>
                         ) : (
                             tickets.map(ticket => (
-                                <tr 
-                                    key={ticket.id} 
+                                <tr
+                                    key={ticket.id}
                                     onClick={() => setSelectedTicket(ticket)}
                                     className="hover:bg-slate-50 transition cursor-pointer"
                                 >
@@ -98,7 +108,7 @@ const Tickets = ({ user }) => {
                                     <td className="py-3 px-4 text-slate-800 text-sm truncate max-w-xs">{ticket.subject}</td>
                                     <td className="py-3 px-4">
                                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
-                                            ticket.status === 'RESOLVED' || ticket.status === 'CLOSED' 
+                                            ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'
                                                 ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
                                                 : ticket.status === 'IN_PROGRESS'
                                                 ? 'bg-blue-100 text-blue-800 border-blue-200'
@@ -130,10 +140,11 @@ const Tickets = ({ user }) => {
                             </button>
                         </div>
                         <form onSubmit={handleCreateSubmit} className="p-4 space-y-4">
+                            {error && <p role="alert" className="text-red-700">{error}</p>}
                             <div>
                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Subject</label>
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     required
                                     value={formData.subject}
                                     onChange={(e) => setFormData({...formData, subject: e.target.value})}
@@ -143,7 +154,7 @@ const Tickets = ({ user }) => {
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Description</label>
-                                <textarea 
+                                <textarea
                                     required
                                     value={formData.description}
                                     onChange={(e) => setFormData({...formData, description: e.target.value})}
@@ -153,7 +164,7 @@ const Tickets = ({ user }) => {
                             </div>
                             <div className="pt-4 flex justify-end gap-2">
                                 <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition">Cancel</button>
-                                <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">Create Ticket</button>
+                                <button type="submit" disabled={saving || !formData.subject.trim() || !formData.description.trim()} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">Create Ticket</button>
                             </div>
                         </form>
                     </div>
@@ -175,8 +186,9 @@ const Tickets = ({ user }) => {
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
-                        
+
                         <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                            {error && <p role="alert" className="text-red-700">{error}</p>}
                             <div>
                                 <h4 className="text-xl font-bold text-slate-900 mb-2">{selectedTicket.subject}</h4>
                                 <div className="flex items-center gap-4 text-xs text-slate-500">
@@ -199,10 +211,11 @@ const Tickets = ({ user }) => {
                                 {selectedTicket.description || "No additional description provided."}
                             </div>
 
+                            <TicketChatHistory key={selectedTicket.id} ticketId={selectedTicket.id} user={user}/>
                             <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-2">Update Ticket Status</label>
-                                    <select disabled={user?.role === "CUSTOMER"} value={selectedTicket.status}
+                                    <select disabled={saving || user?.role === "CUSTOMER"} value={selectedTicket.status}
                                         onChange={handleStatusChange}
                                         className="w-full sm:w-64 border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-blue-500"
                                     >
@@ -212,19 +225,22 @@ const Tickets = ({ user }) => {
                                         <option value="PENDING">PENDING</option>
                                     </select>
                                 </div>
-                                
+
                                 {/* ปุ่ม Assign to Me จะโชว์ก็ต่อเมื่อตั๋วยังไม่มีใครรับงาน */}
                                 {user?.role !== "CUSTOMER" && !selectedTicket.assignee_id && (
-                                    <button 
+                                    <button
                                         onClick={async () => {
+                                            if (saving) return;
+                                            setSaving(true); setError('');
                                             try {
-                                                await assignTicket(selectedTicket.id, user.id); // ส่ง dummy ID ให้ backend ไปหาตัว Support ให้อัตโนมัติ
+                                                await assignTicket(selectedTicket.id, user.id);
                                                 fetchTickets();
                                                 setSelectedTicket(null); // ปิด modal
                                             } catch (err) {
-                                                alert("Failed to assign ticket: " + err.message);
-                                            }
+                                                setError(err.message);
+                                            } finally { setSaving(false); }
                                         }}
+                                        disabled={saving}
                                         className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm mt-5"
                                     >
                                         Assign to Me

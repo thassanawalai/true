@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import Literal
-from routers import tickets, demo_auth, customer_data, customer_chat
+from uuid import UUID
+from routers import tickets, demo_auth, customer_data, customer_chat, chat_rooms
 from core.dependencies import get_db
 from core.demo_auth import current_user
 from core.database import Base, engine
@@ -15,22 +16,41 @@ from models import customer_data as customer_data_models  # register demo tables
 async def lifespan(app: FastAPI):
     # Demo only. Production should use Alembic migrations.
     Base.metadata.create_all(bind=engine)
-    yield
+    import asyncio
+    from services import temporary_chat
+    async def expire_chats():
+        while True:
+            await asyncio.sleep(30)
+            with temporary_chat.lock:
+                temporary_chat.purge()
+    cleanup = asyncio.create_task(expire_chats())
+    try:
+        yield
+    finally:
+        cleanup.cancel()
+        try:
+            await cleanup
+        except asyncio.CancelledError:
+            pass
+        with temporary_chat.lock:
+            temporary_chat.rooms.clear()
 
 app = FastAPI(title="SOC AI Support Assistant API", lifespan=lifespan)
 app.include_router(demo_auth.router)
 app.include_router(tickets.router)
 app.include_router(customer_data.router)
 app.include_router(customer_chat.router)
+app.include_router(chat_rooms.router)
 # Vite proxies /api locally; explicit cross-origin access is disabled by default.
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str
+    content: str = Field(max_length=1000)
 
 class ChatRequest(BaseModel):
-    message: str
-    history: list[ChatMessage] = Field(default_factory=list)
+    message: str = Field(min_length=1, max_length=1000)
+    history: list[ChatMessage] = Field(default_factory=list, max_length=20)
+    company_id: UUID | None = None
 
 @app.get("/")
 def read_root():
@@ -45,4 +65,4 @@ def chat_endpoint(request: ChatRequest, db: Session = Depends(get_db), user=Depe
         raise HTTPException(status_code=503, detail='AI provider not configured') from exc
     return generate_ai_response(request.message, db,
         history=[item.model_dump() for item in request.history[-20:]],
-        user=user)
+        user=user, company_id=request.company_id)

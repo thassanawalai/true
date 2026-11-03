@@ -63,6 +63,7 @@ def create_ticket_from_ai(
     urgency: UrgencyEnum | None = None,
     company_id=None,
     requester_id=None,
+    commit=True,
 ) -> dict:
     """Create a demo incident with the required foreign keys and SLA policy."""
     try:
@@ -119,10 +120,13 @@ def create_ticket_from_ai(
             created_at=datetime.utcnow(),
         )
         db.add(ticket)
-        db.commit()
+        db.flush()
+        if commit:
+            db.commit()
         db.refresh(ticket)
         return {
             "success": True,
+            "ticket_id": ticket.id,
             "ticket_number": ticket.ticket_number,
             "priority": ticket.priority.value,
         }

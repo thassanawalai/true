@@ -15,6 +15,9 @@ class TicketCreate(BaseModel):
 
 class TicketResponse(BaseModel):
     id: UUID
+    company_id: UUID
+    description: str
+    assignee_id: UUID | None = None
     ticket_number: str
     subject: str
     status: str
