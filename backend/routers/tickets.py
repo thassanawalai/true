@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from core.dependencies import get_db
 from core.demo_auth import current_user, internal, visible_ticket
-from models.models import Ticket, User, RoleEnum
-from schemas.ticket import TicketResponse, TicketStatusUpdate
+from models.models import Ticket, User, RoleEnum, TicketCategory, TicketComment
+from schemas.ticket import TicketResponse, TicketStatusUpdate, TicketDetailResponse
 from services.ticket_service import create_ticket_from_ai
 from routers.customer_data import authorized_company
 
@@ -33,9 +33,25 @@ def create_ticket(ticket_in: TicketInput, db: Session = Depends(get_db), user: U
         raise HTTPException(500, "Unable to create ticket")
     return db.query(Ticket).filter(Ticket.ticket_number == result["ticket_number"]).one()
 
-@router.get("/{ticket_id}", response_model=TicketResponse)
+@router.get("/{ticket_id}", response_model=TicketDetailResponse)
 def get_ticket(ticket_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    return visible_ticket(db, ticket_id, user)
+    ticket = visible_ticket(db, ticket_id, user)
+    comments = db.query(TicketComment).filter(TicketComment.ticket_id == ticket.id)
+    if not internal(user):
+        comments = comments.filter(TicketComment.is_internal.is_(False))
+    category = db.get(TicketCategory, ticket.category_id)
+    return {
+        **TicketResponse.model_validate(ticket).model_dump(),
+        'company_name': ticket.company.name if ticket.company else None,
+        'requester_id': ticket.requester_id,
+        'requester_name': ticket.requester.full_name if ticket.requester else None,
+        'assignee_name': ticket.assignee.full_name if ticket.assignee else None,
+        'category_name': category.name if category else None,
+        'updated_at': ticket.updated_at,
+        'comments': [{'id': c.id, 'sender_name': c.sender.full_name if c.sender else None,
+                      'message': c.message, 'is_internal': c.is_internal, 'created_at': c.created_at}
+                     for c in comments.order_by(TicketComment.created_at, TicketComment.id).all()],
+    }
 
 @router.patch("/{ticket_id}/status", response_model=TicketResponse)
 def update_ticket_status(ticket_id: UUID, payload: TicketStatusUpdate, db: Session = Depends(get_db),

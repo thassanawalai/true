@@ -1,0 +1,226 @@
+[
+  {
+    "id": "KB-001",
+    "title": "การเข้าสู่ระบบที่น่าสงสัย",
+    "tags": [
+      "suspicious login",
+      "failed login",
+      "brute force",
+      "brute-force",
+      "login",
+      "เข้าสู่ระบบ",
+      "ล็อกอิน"
+    ],
+    "content": "ตรวจเวลา บัญชี และต้นทางของเหตุการณ์เข้าสู่ระบบ เปรียบเทียบการเข้าใช้ที่สำเร็จและล้มเหลวกับพฤติกรรมปกติ แล้วส่งข้อมูลให้ SOC ตรวจสอบ การล็อกอินล้มเหลวเพียงอย่างเดียวยังไม่ยืนยันว่าบัญชีถูกยึดครอง",
+    "scope": "public",
+    "company_id": null,
+    "source": {
+      "title": "ASD ACSC and partners: Best practices for event logging and threat detection",
+      "url": "https://www.cyber.gov.au/publication/best-practices-for-event-logging-and-threat-detection"
+    },
+    "review": {
+      "date": "2026-11-03",
+      "method": "Source-grounded editorial review by coding assistant; not human SOC approval"
+    }
+  },
+  {
+    "id": "KB-002",
+    "title": "การป้องกันบัญชีด้วย MFA",
+    "tags": [
+      "mfa",
+      "2fa",
+      "2sv",
+      "password",
+      "รหัสผ่าน",
+      "ยืนยันตัวตน"
+    ],
+    "content": "เปิดใช้การยืนยันตัวตนหลายขั้นตอนในบัญชีสำคัญตามวิธีที่บริการรองรับ โดยเฉพาะอีเมล MFA เพิ่มขั้นตรวจสอบนอกเหนือจากรหัสผ่าน ไม่ส่งรหัสผ่านหรือรหัสยืนยันในแชตนี้",
+    "scope": "public",
+    "company_id": null,
+    "source": {
+      "title": "NCSC: Setting up 2-Step Verification",
+      "url": "https://www.ncsc.gov.uk/guidance/setting-2-step-verification-2sv"
+    },
+    "review": {
+      "date": "2026-11-03",
+      "method": "Source-grounded editorial review by coding assistant; not human SOC approval"
+    }
+  },
+  {
+    "id": "KB-003",
+    "title": "อีเมลและข้อความ Phishing",
+    "tags": [
+      "phishing",
+      "ฟิชชิง",
+      "อีเมลหลอก",
+      "อีเมลน่าสงสัย",
+      "scam"
+    ],
+    "content": "หยุดก่อนคลิกลิงก์หรือสแกน QR จากข้อความน่าสงสัย ตรวจคำเร่งรัดและการแอบอ้างองค์กร ยืนยันกับผู้ส่งผ่านช่องทางที่รู้จักอยู่แล้ว และรายงานให้ SOC ตามขั้นตอนองค์กร อย่าสรุปว่าปลอดภัยเพียงเพราะข้อความสะกดถูก",
+    "scope": "public",
+    "company_id": null,
+    "source": {
+      "title": "NCSC: Phishing scams — spotting suspicious messages",
+      "url": "https://www.ncsc.gov.uk/collection/phishing-scams/spot-scams"
+    },
+    "review": {
+      "date": "2026-11-03",
+      "method": "Source-grounded editorial review by coding assistant; not human SOC approval"
+    }
+  },
+  {
+    "id": "KB-004",
+    "title": "การตรวจสอบ SIEM Alert",
+    "tags": [
+      "siem",
+      "alert",
+      "แจ้งเตือน",
+      "security event"
+    ],
+    "content": "ตรวจเวลา แหล่งข้อมูล ประเภทเหตุการณ์ และข้อมูลผู้ใช้หรืออุปกรณ์ที่เกี่ยวข้อง เปรียบเทียบ log หลายแหล่งเพื่อแยกความผิดปกติออกจากกิจกรรมปกติ Alert เป็นจุดเริ่มต้นการตรวจสอบ ไม่ใช่ข้อสรุปเหตุบุกรุก",
+    "scope": "public",
+    "company_id": null,
+    "source": {
+      "title": "ASD ACSC and partners: Best practices for event logging and threat detection",
+      "url": "https://www.cyber.gov.au/publication/best-practices-for-event-logging-and-threat-detection"
+    },
+    "review": {
+      "date": "2026-11-03",
+      "method": "Source-grounded editorial review by coding assistant; not human SOC approval"
+    }
+  },
+  {
+    "id": "KB-005",
+    "title": "การจัดการเหตุการณ์เบื้องต้น",
+    "tags": [
+      "incident response",
+      "incident",
+      "breach",
+      "รับมือ",
+      "เหตุการณ์"
+    ],
+    "content": "ใช้แผนรับมือเหตุการณ์ขององค์กรเพื่อประสานผู้รับผิดชอบ เชื่อมการตรวจจับ การตอบสนอง และการกู้คืนเข้ากับการบริหารความเสี่ยง ระบุสิ่งที่ทราบและสิ่งที่ยังต้องตรวจสอบก่อนสรุปผล ระบบนี้ให้คำแนะนำและไม่ได้ดำเนินการตอบสนองแทนเจ้าหน้าที่",
+    "scope": "public",
+    "company_id": null,
+    "source": {
+      "title": "NIST SP 800-61 Rev. 3: Incident Response",
+      "url": "https://csrc.nist.gov/pubs/sp/800/61/r3/final"
+    },
+    "review": {
+      "date": "2026-11-03",
+      "method": "Source-grounded editorial review by coding assistant; not human SOC approval"
+    }
+  },
+  {
+    "id": "KB-006",
+    "title": "เมื่อสงสัย Malware หรือ Ransomware",
+    "tags": [
+      "malware",
+      "ransomware",
+      "มัลแวร์",
+      "เรียกค่าไถ่",
+      "edr"
+    ],
+    "content": "ให้ SOC ประเมินขอบเขตและประสานแยกระบบที่ได้รับผลกระทบตามอำนาจอนุมัติ ตรวจว่าระบบรักษาความปลอดภัยและ log ถูกปิดหรือไม่ หลีกเลี่ยงการเชื่อมระบบกลับจนผู้รับผิดชอบตรวจสอบ ไม่สรุปชนิดมัลแวร์จากชื่อ alert เพียงอย่างเดียว",
+    "scope": "public",
+    "company_id": null,
+    "source": {
+      "title": "Microsoft: Incident Response team ransomware approach",
+      "url": "https://learn.microsoft.com/en-us/security/ransomware/incident-response-playbook-dart-ransomware-approach"
+    },
+    "review": {
+      "date": "2026-11-03",
+      "method": "Source-grounded editorial review by coding assistant; not human SOC approval"
+    }
+  },
+  {
+    "id": "KB-007",
+    "title": "การตรวจ Port Scan และ Firewall",
+    "tags": [
+      "port scan",
+      "scan",
+      "firewall",
+      "blocked traffic",
+      "สแกนพอร์ต",
+      "ไฟร์วอลล์"
+    ],
+    "content": "ใช้ log เครือข่ายตรวจเวลา IP ต้นทางและปลายทาง รวมถึงผลการอนุญาตหรือปฏิเสธ เปรียบเทียบเหตุการณ์ที่เกี่ยวข้องก่อนส่งให้ SOC ตรวจสอบ การถูก firewall บล็อกไม่ได้ยืนยันว่าผู้โจมตีเข้าระบบสำเร็จ",
+    "scope": "public",
+    "company_id": null,
+    "source": {
+      "title": "ASD ACSC and partners: Best practices for event logging and threat detection",
+      "url": "https://www.cyber.gov.au/publication/best-practices-for-event-logging-and-threat-detection"
+    },
+    "review": {
+      "date": "2026-11-03",
+      "method": "Source-grounded editorial review by coding assistant; not human SOC approval"
+    }
+  },
+  {
+    "id": "KB-008",
+    "title": "เมื่อข้อมูล Log ไม่เพียงพอ",
+    "tags": [
+      "log loss",
+      "collector",
+      "missing log",
+      "log หาย",
+      "คอลเลกเตอร์",
+      "ข้อมูลไม่เพียงพอ"
+    ],
+    "content": "ตรวจการทำงานของระบบบันทึกและการเชื่อมต่อไปยังปลายทาง รวมถึงพื้นที่จัดเก็บและสิทธิ์ที่จำเป็น ระบุช่วงข้อมูลที่ขาดให้ SOC ทราบ การไม่มี log ไม่ได้ยืนยันว่าไม่มีเหตุการณ์ และไม่ควรเติมเหตุการณ์ที่ไม่พบหลักฐาน",
+    "scope": "public",
+    "company_id": null,
+    "source": {
+      "title": "OWASP: Logging Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html"
+    },
+    "review": {
+      "date": "2026-11-03",
+      "method": "Source-grounded editorial review by coding assistant; not human SOC approval"
+    }
+  },
+  {
+    "id": "KB-009",
+    "title": "การกู้คืนหลัง Ransomware",
+    "tags": [
+      "backup",
+      "restore",
+      "recovery",
+      "สำรองข้อมูล",
+      "กู้คืน"
+    ],
+    "content": "ให้ผู้รับผิดชอบตรวจความพร้อมของข้อมูลสำรองและความปลอดภัยของสภาพแวดล้อมก่อนกู้คืน ผู้โจมตีอาจทำลายข้อมูลสำรองหรือระบบป้องกัน จึงต้องประเมินการเข้าถึงของผู้โจมตีร่วมด้วย ไม่ถือว่ากู้คืนสำเร็จเพียงเพราะมีไฟล์สำรอง",
+    "scope": "public",
+    "company_id": null,
+    "source": {
+      "title": "Microsoft: Incident Response team ransomware approach",
+      "url": "https://learn.microsoft.com/en-us/security/ransomware/incident-response-playbook-dart-ransomware-approach"
+    },
+    "review": {
+      "date": "2026-11-03",
+      "method": "Source-grounded editorial review by coding assistant; not human SOC approval"
+    }
+  },
+  {
+    "id": "KB-010",
+    "title": "การจัดการข้อมูลอ่อนไหวใน Log",
+    "tags": [
+      "secret",
+      "token",
+      "credential",
+      "ข้อมูลลับ",
+      "ข้อมูลอ่อนไหว"
+    ],
+    "content": "หลีกเลี่ยงการบันทึกรหัสผ่าน access token และข้อมูลเชื่อมต่อฐานข้อมูลลง log จำกัดสิทธิ์ผู้เข้าถึงบันทึกและป้องกันการแก้ไขโดยไม่ได้รับอนุญาต ส่งให้ SOC เฉพาะข้อมูลที่จำเป็นผ่านช่องทางที่องค์กรอนุมัติ",
+    "scope": "public",
+    "company_id": null,
+    "source": {
+      "title": "OWASP: Logging Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html"
+    },
+    "review": {
+      "date": "2026-11-03",
+      "method": "Source-grounded editorial review by coding assistant; not human SOC approval"
+    }
+  }
+]

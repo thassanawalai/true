@@ -35,3 +35,21 @@ class TicketAssign(BaseModel):
 
 class TicketStatusUpdate(BaseModel):
     status: str
+
+
+class TicketCommentResponse(BaseModel):
+    id: UUID
+    sender_name: str | None
+    message: str
+    is_internal: bool
+    created_at: datetime
+
+
+class TicketDetailResponse(TicketResponse):
+    company_name: str | None
+    requester_id: UUID
+    requester_name: str | None
+    assignee_name: str | None
+    category_name: str | None
+    updated_at: datetime | None
+    comments: list[TicketCommentResponse]

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getTickets, createTicket, updateTicketStatus, assignTicket } from '../services/api';
-import { Plus, X, Clock, AlertCircle } from 'lucide-react';
-import { UserCircle } from 'lucide-react';
-import { TicketChatHistory } from '../components/PrivateChat';
+import { getTickets, createTicket } from '../services/api';
+import { Plus, X } from 'lucide-react';
+import TicketDetail from '../components/TicketDetail';
 
 const Tickets = ({ user, companyId }) => {
     const [tickets, setTickets] = useState([]);
@@ -51,21 +50,6 @@ const Tickets = ({ user, companyId }) => {
         } finally { setSaving(false); }
     };
 
-    const handleStatusChange = async (e) => {
-        const newStatus = e.target.value;
-        if (!selectedTicket || saving) return;
-        setSaving(true); setError('');
-
-        try {
-            await updateTicketStatus(selectedTicket.id, newStatus);
-            // Update the local state to reflect the change immediately
-            setSelectedTicket({ ...selectedTicket, status: newStatus });
-            fetchTickets();
-        } catch (error) {
-            setError(error.message);
-        } finally { setSaving(false); }
-    };
-
     if (loading) return <div role="status" className="p-6 text-slate-500">Loading tickets…</div>;
 
     return (
@@ -104,7 +88,7 @@ const Tickets = ({ user, companyId }) => {
                                     onClick={() => setSelectedTicket(ticket)}
                                     className="hover:bg-slate-50 transition cursor-pointer"
                                 >
-                                    <td className="py-3 px-4 text-blue-600 font-medium text-sm">{ticket.ticket_number}</td>
+                                    <td className="py-3 px-4 text-blue-600 font-medium text-sm"><button onClick={e => { e.stopPropagation(); setSelectedTicket(ticket); }}>{ticket.ticket_number}</button></td>
                                     <td className="py-3 px-4 text-slate-800 text-sm truncate max-w-xs">{ticket.subject}</td>
                                     <td className="py-3 px-4">
                                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
@@ -171,86 +155,9 @@ const Tickets = ({ user, companyId }) => {
                 </div>
             )}
 
-            {/* Ticket Detail Modal */}
-            {selectedTicket && (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                        <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
-                            <div className="flex items-center gap-3">
-                                <h3 className="font-bold text-slate-800 text-lg">{selectedTicket.ticket_number}</h3>
-                                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-200 text-slate-800 uppercase tracking-wide">
-                                    {selectedTicket.priority}
-                                </span>
-                            </div>
-                            <button onClick={() => setSelectedTicket(null)} className="text-slate-400 hover:text-slate-600">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
+            {selectedTicket && <TicketDetail key={selectedTicket.id} ticketId={selectedTicket.id} user={user}
+                onClose={() => setSelectedTicket(null)} onChanged={() => fetchTickets()}/>}
 
-                        <div className="p-6 overflow-y-auto flex-1 space-y-6">
-                            {error && <p role="alert" className="text-red-700">{error}</p>}
-                            <div>
-                                <h4 className="text-xl font-bold text-slate-900 mb-2">{selectedTicket.subject}</h4>
-                                <div className="flex items-center gap-4 text-xs text-slate-500">
-                                    <div className="flex items-center gap-1">
-                                        <Clock className="w-3.5 h-3.5" />
-                                        <span>Created: {new Date(selectedTicket.created_at).toLocaleString()}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <AlertCircle className="w-3.5 h-3.5" />
-                                        <span>Impact: {selectedTicket.impact} | Urgency: {selectedTicket.urgency}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1 font-semibold text-blue-600">
-                                        <UserCircle className="w-3.5 h-3.5" />
-                                        <span>{selectedTicket.assignee_id ? 'Assigned' : 'Unassigned'}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 text-sm text-slate-700 whitespace-pre-wrap">
-                                {selectedTicket.description || "No additional description provided."}
-                            </div>
-
-                            <TicketChatHistory key={selectedTicket.id} ticketId={selectedTicket.id} user={user}/>
-                            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-2">Update Ticket Status</label>
-                                    <select disabled={saving || user?.role === "CUSTOMER"} value={selectedTicket.status}
-                                        onChange={handleStatusChange}
-                                        className="w-full sm:w-64 border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        <option value="NEW">NEW</option>
-                                        <option value="IN_PROGRESS">IN PROGRESS</option>
-                                        <option value="RESOLVED">RESOLVED (Stop SLA Timer)</option>
-                                        <option value="PENDING">PENDING</option>
-                                    </select>
-                                </div>
-
-                                {/* ปุ่ม Assign to Me จะโชว์ก็ต่อเมื่อตั๋วยังไม่มีใครรับงาน */}
-                                {user?.role !== "CUSTOMER" && !selectedTicket.assignee_id && (
-                                    <button
-                                        onClick={async () => {
-                                            if (saving) return;
-                                            setSaving(true); setError('');
-                                            try {
-                                                await assignTicket(selectedTicket.id, user.id);
-                                                fetchTickets();
-                                                setSelectedTicket(null); // ปิด modal
-                                            } catch (err) {
-                                                setError(err.message);
-                                            } finally { setSaving(false); }
-                                        }}
-                                        disabled={saving}
-                                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm mt-5"
-                                    >
-                                        Assign to Me
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

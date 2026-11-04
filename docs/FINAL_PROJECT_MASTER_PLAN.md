@@ -324,6 +324,87 @@ Specify a deterministic matrix using available evidence (e.g., asset criticality
 | 2026-11-04 | Require tenant-safe retrieval and evidence validation | Protect data separation and prevent unsupported conclusions |
 | 2026-11-04 | Defer UI redesign, new SIEM integration, and production auth | Out of research scope and high schedule risk |
 
+### CR-20261104-01 — Phase 1.1 security remediation and baseline preparation
+
+- **Requested/approved by:** Project developer, explicit Phase 1.1 task authorization.
+- **Decision:** Approved, limited to tracked Compose credential hygiene, raw-log tenant
+  reference validation, synthetic regressions, and this decision/evidence record.
+- **Evidence:** Baseline audit found a database password literal in tracked Compose
+  configuration, and raw logs could expose another tenant's asset/collector IDs when
+  foreign-key relationships were inconsistent. No credential values are recorded here.
+- **Implementation:** Compose now requires `POSTGRES_PASSWORD` and
+  `COMPOSE_DATABASE_URL` environment variables with no password defaults. The latter
+  supplies the backend's `DATABASE_URL` for the Compose `db` hostname, keeping the
+  existing host-run `backend/.env` `DATABASE_URL` independent. Compose interpolation
+  may read local `backend/.env`; service `env_file` remains unchanged. Both Compose
+  settings must describe the same database role/password; URL passwords must be
+  percent-encoded. No local environment file was edited.
+- **Raw logs:** Require the log, joined asset, and joined collector to belong to the
+  authorized company before ordering/limiting. Inconsistent or dangling records are
+  omitted; valid records retain the existing response fields, order, and 100-row cap.
+  Authentication and internal-user company-selection rules are unchanged.
+- **Files:** `backend/docker-compose.yml`, `backend/routers/customer_data.py`,
+  `backend/tests/test_customer_logs_isolation.py`,
+  `backend/scripts/test_phase_ab_offline.py`, and this Master Plan only.
+- **Scope impact:** No schema migration, AI/KB/chat/ticket/frontend behavior changes,
+  new service, or dependency. Baseline analysis/scoring remains unchanged.
+- **Verification (2026-11-04):** PASS — 64 offline tests (60 existing + 4 new),
+  synthetic in-memory SQLite and mocked SDK; outbound sockets blocked by the runner.
+  New cases cover A→B and B→A malformed asset/collector references, dangling refs,
+  foreign log ownership, ADMIN/SUPPORT selected scopes, authorization, empty results,
+  and filtering before the 100-row limit. PASS — in-memory compilation of the three
+  affected Python files. PASS — Compose `config --quiet` using synthetic interpolation
+  values (no containers started). PASS — Vite production build in memory,
+  2,146 transformed modules; no frontend source/output files changed.
+- **Runtime/credential status:** No connection to or modification of the existing demo
+  database, no service restart, and no live Gemini request was performed. PostgreSQL
+  integration was not rerun in this change. **Credential rotation is NOT performed.**
+  **Git history is NOT cleaned:** editing current Compose does not remove secrets
+  from existing commits, clones, caches, or previously published copies. Treat the
+  previously tracked credential as exposed pending rotation.
+- **Commit status:** No staging, commit, push, merge, or reset performed. This is a
+  security-remediation record, not completion of baseline freeze or research evaluation.
+
+**Reproduction commands (repository root, except frontend command):**
+
+```bash
+PYTHONWARNINGS=ignore backend/.venv/bin/python -B backend/scripts/test_phase_ab_offline.py
+POSTGRES_PASSWORD=synthetic-compose-check COMPOSE_DATABASE_URL=postgresql+psycopg2://itsm_user:synthetic-compose-check@db:5432/itsm_db docker compose --env-file /dev/null -f backend/docker-compose.yml config --quiet
+```
+
+The literal in that command is synthetic test input, not a database credential.
+Do not use `docker compose config` without `--quiet` with real settings: rendered
+configuration may expose secrets. Compilation used Python `compile()` in memory.
+Frontend check from `frontend/` used the existing Vite config with
+`configFile:false`, `envDir:false`, and `build:{write:false,emptyOutDir:false}`.
+
+**Manual credential rotation procedure — future authorized maintenance only:**
+
+1. Identify the actual PostgreSQL instance/role and all clients (host-run demo versus
+   optional Compose). Plan a maintenance window, verify a protected backup/restore
+   route, and retain administrative access. Do not run seed/recovery scripts or
+   recreate/delete database volumes as part of credential rotation.
+2. Generate a unique password in an approved password manager. Do not paste it into
+   shell commands, SQL literals, reports, source files, or shared terminal output.
+3. In a trusted interactive `psql` administrative session connected to the intended
+   instance, use `\password itsm_user` (or the verified application role). Enter the
+   new password at the hidden prompts. This is a deliberate live change and was not
+   executed by this remediation.
+4. Update the ignored local `backend/.env` securely. Keep the host-run `DATABASE_URL`
+   hostname/database unchanged and percent-encode the new URL password. If Compose
+   is used, supply `POSTGRES_PASSWORD` plus matching `COMPOSE_DATABASE_URL` targeting
+   `db:5432`; do not commit either value. Merely changing `POSTGRES_PASSWORD` does
+   **not** rotate a role in an already initialized PostgreSQL volume.
+5. Restart only affected application clients during the maintenance window to refresh
+   connection pools. Verify a new authenticated connection and read-only `SELECT 1`
+   without printing the URL/password, then check normal demo access. Verify the old
+   credential no longer authenticates using a fresh connection. If recovery is
+   needed, use the administrative session and a new credential rather than restoring
+   the exposed password or deleting the database volume.
+6. Coordinate any Git-history cleanup separately with repository collaborators;
+   rotation remains necessary even if history is later rewritten. Record completion
+   and verification only after these actions actually succeed.
+
 ## 16. Known risks and mitigation
 
 | Risk | Mitigation |

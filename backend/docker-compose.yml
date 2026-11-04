@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: itsm_user
-      POSTGRES_PASSWORD: itsm_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in local backend/.env}
       POSTGRES_DB: itsm_db
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -22,7 +22,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+psycopg2://itsm_user:itsm_password@db:5432/itsm_db
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:?Set COMPOSE_DATABASE_URL for the Compose db service}
     ports:
       - "8000:8080"
     volumes:

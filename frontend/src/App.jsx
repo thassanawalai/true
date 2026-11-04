@@ -1,21 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import Tickets from './pages/Tickets';
 import PrivateChat from './components/PrivateChat';
+import { ShieldAlert, MessageSquare, Ticket, LogOut, BookOpen, Send, Bot, UserRound } from 'lucide-react';
+import ChatAnswer from './components/ChatAnswer';
 import { api, getToken } from './services/api';
 
-function Chat({ companyId, internal }) {
+function Chat({ companyId, companyName, internal }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const pending = useRef(false);
   const controller = useRef(null);
+  const messageEnd = useRef(null);
+  useEffect(() => { messageEnd.current?.scrollIntoView({ block: 'nearest' }); }, [messages, busy]);
   useEffect(() => () => controller.current?.abort(), []);
-  const send = async event => {
-    event.preventDefault();
-    const message = input.trim();
+  const send = async (question = input) => {
+    const message = question.trim();
     if (!message || pending.current || (internal && !companyId)) return;
     pending.current = true;
     controller.current = new AbortController();
@@ -32,20 +33,36 @@ function Chat({ companyId, internal }) {
     } finally { pending.current = false; setBusy(false); }
   };
   const disabled = busy || (internal && !companyId);
-  return <main className="max-w-3xl mx-auto p-5">
-    <h2 className="text-xl font-bold mb-2">{internal ? 'Company Q&A' : 'Support Assistant'}</h2>
-    <p className="text-sm text-slate-400 mb-4">Demo telemetry Q&A with rule-based fallback. Chat stays in this view only.</p>
-    <div className="space-y-3 min-h-[55vh]" aria-live="polite">
-      {!messages.length && <p className="text-slate-400">{internal && !companyId ? 'Select a customer company to begin.' : 'Ask about assets, IP addresses, log collectors, or security events.'}</p>}
-      {messages.map((message, index) => <div key={index} className={'rounded-xl p-3 ' + (message.role === 'user' ? 'bg-blue-900 ml-12' : 'bg-slate-800 mr-12')}><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown></div>)}
-      {busy && <p role="status">Loading answer…</p>}
+  const suggestions = [
+    'What IP addresses belong to this company?',
+    'Show recent security alerts.',
+    'Are there suspicious login events?',
+    "Summarize this company's security logs.",
+  ];
+  return <main className="security-insights">
+    <div><h2 className="text-xl font-bold">Security Insights</h2>
+      <p className="text-sm text-slate-400 mt-1">Ask questions about a selected company's security information.</p>
+      <p className="insights-company">{companyId ? companyName : 'Select a company to begin'}</p>
     </div>
-    {error && <p role="alert" className="text-red-300 my-3">{error} Please try again.</p>}
-    <form onSubmit={send} className="flex gap-2 mt-4">
-      <input aria-label="Chat message" maxLength={1000} disabled={disabled} className="min-w-0 flex-1 bg-slate-800 rounded p-3" value={input} onChange={event => setInput(event.target.value)} placeholder="Ask about your company telemetry…" />
-      <button disabled={disabled || !input.trim()} className="bg-blue-600 px-5 rounded disabled:opacity-50">Send</button>
+    <div className="insights-suggestions" aria-label="Suggested questions">
+      {suggestions.map(question => <button key={question} disabled={disabled} onClick={() => send(question)}>{question}</button>)}
+    </div>
+    <div className="chat-messages" aria-live="polite" aria-label="Security Insights conversation">
+      {!messages.length && <p className="text-sm text-slate-400">{companyId ? 'Choose a suggested question or ask your own. This conversation stays separate from customer conversations.' : 'Choose a company above to explore its security information.'}</p>}
+      {messages.map((message, index) => <article key={index} className={'chat-bubble ' + (message.role === 'user' ? 'chat-customer' : 'chat-assistant')}>
+        <p className="chat-sender">{message.role === 'user' ? <UserRound size={16}/> : <Bot size={16}/>} {message.role === 'user' ? 'You' : 'SOC Assistant'}</p>
+        <ChatAnswer content={message.content}/>
+      </article>)}
+      {busy && <p role="status" className="text-sm text-blue-300">Reviewing {companyName}'s security information…</p>}
+      <div ref={messageEnd}/>
+    </div>
+    {error && <p role="alert" className="text-red-300 text-sm">{error} Please try again.</p>}
+    <form onSubmit={event => { event.preventDefault(); send(); }} className="chat-composer">
+      <input aria-label="Security Insights question" maxLength={1000} disabled={disabled} className="min-w-0 flex-1 bg-slate-800 rounded p-3" value={input} onChange={event => setInput(event.target.value)} placeholder={companyId ? 'Ask about this company’s security…' : 'Select a company first'}/>
+      <button aria-label="Send question" disabled={disabled || !input.trim()} className="bg-blue-600 px-4 rounded disabled:opacity-50"><Send size={17}/><span>Send</span></button>
     </form>
   </main>;
+
 }
 
 function Portal({ user, logout }) {
@@ -64,20 +81,22 @@ function Portal({ user, logout }) {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [internal, retry]);
-  return <div className="min-h-screen bg-slate-950 text-white">
-    <header className="p-4 bg-slate-900 flex flex-wrap items-center justify-between gap-3">
-      <div><strong>{internal ? 'SOC Internal Portal' : 'SOC Customer Portal'}</strong><p className="text-xs text-slate-400">{user.name} · {user.company} · {user.role}</p></div>
-      <nav className="flex gap-3" aria-label="Portal navigation">
-        <button aria-current={view === 'rooms' ? 'page' : undefined} onClick={() => setView('rooms')}>{internal ? 'Customer Chats' : 'Chat'}</button>
-        {internal && <button aria-current={view === 'chat' ? 'page' : undefined} onClick={() => setView('chat')}>Company Q&A</button>}
-        <button aria-current={view === 'tickets' ? 'page' : undefined} onClick={() => setView('tickets')}>{internal ? 'Company Tickets' : 'My Company Tickets'}</button>
-        <button onClick={logout} className="text-red-300">Logout</button>
+  return <div className="soc-portal bg-slate-950 text-white">
+    <aside className="portal-sidebar">
+      <div className="portal-brand"><ShieldAlert size={30}/><div><strong>SOC COPILOT</strong><p>Security Support Assistant</p></div></div>
+      <nav aria-label="Portal navigation">
+        <button aria-current={view === 'rooms' ? 'page' : undefined} onClick={() => setView('rooms')}><MessageSquare size={19}/>{internal ? 'Customer Conversations' : 'Chat'}</button>
+        {internal && <button aria-current={view === 'chat' ? 'page' : undefined} onClick={() => setView('chat')}><BookOpen size={19}/>Security Insights</button>}
+        <button aria-current={view === 'tickets' ? 'page' : undefined} onClick={() => setView('tickets')}><Ticket size={19}/>{internal ? 'Ticket Management' : 'My Company Tickets'}</button>
       </nav>
-    </header>
-    {internal && <section className="max-w-3xl mx-auto p-5">
-      <label htmlFor="company">Customer company</label>
+      <div className="portal-account"><strong>{user.name}</strong><p>{user.company}</p><button onClick={logout}><LogOut size={16}/>Logout</button></div>
+    </aside>
+    <div className="portal-workspace">
+      <header className="portal-heading"><div><strong>{internal ? 'SOC Internal Portal' : 'SOC Customer Portal'}</strong><p>พื้นที่ช่วยเหลือด้านความปลอดภัยของคุณ</p></div><span>{user.role}</span></header>
+    {internal && <section className="company-context">
+      <label htmlFor="company">Select customer company</label>
       <select id="company" disabled={loading} className="block w-full bg-slate-800 rounded p-3 mt-2" value={companyId} onChange={event => setCompanyId(event.target.value)}>
-        <option value="">All companies (chat rooms)</option>
+        <option value="">{view === 'rooms' ? 'All companies (conversations)' : 'Select a company'}</option>
         {companies.map(company => <option key={company.id} value={company.id}>{company.name}</option>)}
       </select>
       {loading && <p role="status">Loading companies…</p>}
@@ -86,7 +105,8 @@ function Portal({ user, logout }) {
     </section>}
     {view === 'tickets'
       ? <div className="bg-slate-50 text-slate-900 min-h-screen">{internal && !companyId ? <p className="p-6">Select a customer company to view tickets.</p> : <Tickets key={companyId || user.company_id} user={user} companyId={internal ? companyId : undefined}/>}</div>
-      : view === 'rooms' ? <PrivateChat key={companyId || user.id} user={user} companyId={companyId}/> : <Chat key={companyId || user.company_id} internal={internal} companyId={companyId}/>}
+      : view === 'rooms' ? <PrivateChat key={companyId || user.id} user={user} companyId={companyId}/> : <Chat key={companyId || user.company_id} internal={internal} companyId={companyId} companyName={companies.find(company => company.id === companyId)?.name || 'Selected company'}/>}
+    </div>
   </div>;
 }
 

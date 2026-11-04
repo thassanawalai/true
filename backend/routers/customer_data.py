@@ -39,6 +39,13 @@ def collectors(company_id: UUID | None = Query(default=None), db: Session = Depe
 def logs(company_id: UUID | None = Query(default=None), db: Session = Depends(get_db),
          user: User = Depends(current_user)):
     cid = authorized_company(db, user, company_id)
-    rows = db.query(CustomerLog).filter(CustomerLog.company_id == cid).order_by(CustomerLog.occurred_at.desc()).limit(100).all()
+    # Foreign keys alone do not enforce company consistency. Exclude malformed
+    # relationships before limiting results, including dangling references.
+    rows = (db.query(CustomerLog)
+            .join(CustomerAsset, CustomerLog.asset_id == CustomerAsset.id)
+            .join(LogCollector, CustomerLog.collector_id == LogCollector.id)
+            .filter(CustomerLog.company_id == cid,
+                    CustomerAsset.company_id == cid, LogCollector.company_id == cid)
+            .order_by(CustomerLog.occurred_at.desc()).limit(100).all())
     return [{"id": str(r.id), "asset_id": str(r.asset_id), "collector_id": str(r.collector_id),
              "event_type": r.event_type, "message": r.message, "occurred_at": r.occurred_at.isoformat()} for r in rows]

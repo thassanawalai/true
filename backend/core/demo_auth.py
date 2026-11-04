@@ -23,7 +23,11 @@ def issue_token(user):
     signature = hmac.new(_secret(), body.encode(), hashlib.sha256).hexdigest()
     return body + "." + signature
 
-def current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)):
+def current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db),
+                 x_demo_authorization: str | None = Header(default=None)):
+    # Keep application sessions separate from the Cloud Shell proxy's Authorization.
+    if x_demo_authorization is not None:
+        authorization = x_demo_authorization
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Login required")
     try:
