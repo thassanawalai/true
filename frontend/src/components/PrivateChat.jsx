@@ -94,20 +94,25 @@ export function RoomConversation({ roomId, user, onLinked }) {
           const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 70;
           followLatest.current = nearBottom; setReadingEarlier(!nearBottom);
         }}>
-          {!room.messages.length && <div className="soc-chat-empty"><span className="soc-chat-orb"><ShieldCheck size={32}/></span><h3>มีเรื่องใดให้เราช่วยดูแล?</h3><p>{internal ? 'รอข้อความและคำตอบแรกจากผู้ช่วย ก่อนตอบกลับในนาม SOC' : 'เล่าเหตุการณ์หรือสิ่งที่คุณสงสัย\nผู้ช่วยพร้อมแนะนำขั้นตอนและแหล่งอ้างอิงให้คุณ'}</p></div>}
-          {room.messages.map(message => <article key={message.id} className={'chat-bubble ' + (message.role === 'customer' ? 'chat-customer' : message.role === 'assistant' ? 'chat-assistant' : 'chat-analyst')}>
+          {!room.messages.length && <div className="soc-chat-empty"><span className="soc-chat-orb"><ShieldCheck size={32}/></span><h3>มีเรื่องใดให้เราช่วยดูแล?</h3><p>{internal ? 'รอข้อความและคำตอบแรกจากผู้ช่วย ก่อนตอบกลับในนาม SOC' : 'ถามเรื่องความปลอดภัยได้เลย เช่น “phishing คืออะไร” หรือ “MFA ช่วยอย่างไร”\nคำถามทั่วไปตอบจาก KB โดยไม่อ่าน Log; กดวิเคราะห์ Log เมื่อต้องการตรวจเหตุการณ์'}</p></div>}
+          {room.messages.map((message, index) => <article key={message.id} className={'chat-bubble ' + (message.role === 'customer' ? 'chat-customer' : message.role === 'assistant' ? 'chat-assistant' : 'chat-analyst')}>
             <p className="chat-sender">{message.role === 'customer' ? <UserRound size={15}/> : message.role === 'assistant' ? <Bot size={16}/> : <ShieldCheck size={16}/>}
               {message.role === 'customer' ? (internal ? message.sender_name : 'คุณ') : message.role === 'assistant' ? 'ผู้ช่วย SOC' : message.sender_name}
-              {message.role !== 'customer' && <span className="soc-role-label">{message.role === 'assistant' ? 'AI Assistant' : 'SOC Analyst'}</span>}
+              {message.role !== 'customer' && <span className="soc-role-label">{message.role === 'assistant' ? 'ผู้ช่วยความปลอดภัย' : 'SOC Analyst'}</span>}
             </p>
-            <ChatAnswer content={message.content}/>
+            <ChatAnswer content={message.content} disabled={busy} onAnalyze={!internal && message.role === 'assistant' ? (details = false) => {
+              const previous = room.messages.slice(0, index).findLast(item => item.role === 'customer');
+              if (!previous) return;
+              const content = previous.content.replace(/^(?:วิเคราะห์ Log|รายละเอียด Log): /, '');
+              mutate('/messages', { content, action: 'analyze_log', details });
+            } : undefined} canAnalyze={message.role === 'assistant' && /login|log|alert|phishing|malware|ransomware|scan|siem|incident|เข้าสู่ระบบ|ล็อกอิน|ฟิชชิง|มัลแวร์|เหตุการณ์|สแกน|เรียกค่าไถ่/i.test(room.messages.slice(0, index).findLast(item => item.role === 'customer')?.content || '')}/>
           </article>)}
-          {busy && <p className="soc-sending" role="status"><span/>กำลังดำเนินการ…</p>}
+          {busy && <p className="soc-sending" role="status"><span/>กำลังเตรียมคำตอบ…</p>}
         </div>
         {readingEarlier && <button className="soc-latest" onClick={() => { followLatest.current = true; messageList.current.scrollTop = messageList.current.scrollHeight; setReadingEarlier(false); }}><ArrowDown size={15}/>ข้อความล่าสุด</button>}
       </div>
       <form className="chat-composer" onSubmit={event => { event.preventDefault(); if (input.trim()) mutate('/messages', { content: input.trim() }); }}>
-        <div className="soc-composer-field"><textarea rows={2} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form.requestSubmit(); } }} aria-label="ข้อความ" maxLength={1000} value={input} onChange={event => setInput(event.target.value)} disabled={busy || (internal && !room.messages.length)} placeholder={internal ? 'ตอบกลับในนาม SOC…' : 'พิมพ์ข้อความเพื่อเริ่มรับความช่วยเหลือ…'}/>
+        <div className="soc-composer-field"><textarea rows={2} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form.requestSubmit(); } }} aria-label="ข้อความ" maxLength={1000} value={input} onChange={event => setInput(event.target.value)} disabled={busy || (internal && !room.messages.length)} placeholder={internal ? 'ตอบกลับในนาม SOC…' : 'ถามเรื่องความปลอดภัย เช่น phishing หรือ MFA…'}/>
           <button aria-label={internal ? 'ตอบกลับ' : 'ส่งข้อความ'} disabled={busy || !input.trim() || (internal && !room.messages.length)}><Send size={19}/></button>
         </div>
         <p>Enter เพื่อส่ง · Shift + Enter เพื่อขึ้นบรรทัดใหม่</p>

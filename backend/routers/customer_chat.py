@@ -13,13 +13,16 @@ router = APIRouter(prefix='/api/customer-data', tags=['Customer Data Chat'])
 
 
 class AskRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    action: Literal["knowledge", "analyze_log"] = "knowledge"
+    details: bool = False
     message: str = Field(min_length=1, max_length=1000)
     company_id: UUID | None = None
 
 
 @router.post('/ask')
 def ask(request: AskRequest, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    return answer_question(request.message, db, user, request.company_id)
+    return answer_question(request.message, db, user, request.company_id, action=request.action, details=request.details)
 
 
 class ExperimentRequest(BaseModel):

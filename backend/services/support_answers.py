@@ -57,7 +57,7 @@ def verified_demo(company_name, assets, collectors, logs):
     return evidence[:12]
 
 
-def answer_question(message, db, user, company_id=None, history=None):
+def answer_question(message, db, user, company_id=None, history=None, *, action="knowledge", details=False):
     cid = authorized_company(db, user, company_id)  # before any retrieval/provider
     if re.fullmatch(r'(?:สวัสดี(?:ครับ|ค่ะ|คะ)?|หวัดดี(?:ครับ|ค่ะ)?|hello|hi|hey)[\s!.]*', message.strip(), re.IGNORECASE):
         return {'answer': 'สวัสดีค่ะ มีเรื่องความปลอดภัยใดให้ช่วยแนะนำบ้างคะ? เช่น อีเมลน่าสงสัย การเข้าสู่ระบบ หรือการรับมือเหตุการณ์',
@@ -66,12 +66,11 @@ def answer_question(message, db, user, company_id=None, history=None):
                 'category': 'logs', 'company_id': str(cid),
                 'counts': {'assets': 0, 'collectors': 0, 'logs': 0}}
     documents = knowledge_base.retrieve(message, cid)
-    topics = question_topics(message)
     inventory_only = bool(re.fullmatch(r'(?:show |list |recent )?(?:logs|events|assets|collectors)[?.! ]*',
                                        message.strip(), re.IGNORECASE))
-    analysis = (security_analysis.analyze(message, db, cid)
-                if not inventory_only and (topics['category'] == 'logs' or topics['topics'] != ['security_support']
-                    or security_analysis.classify(message)[0] != 'unknown_security_issue') else None)
+    if action == 'knowledge' and not inventory_only:
+        return knowledge_answer(message, cid, documents[:1], history)
+    analysis = security_analysis.analyze(message, db, cid) if action == 'analyze_log' else None
     assets = db.query(CustomerAsset).filter(CustomerAsset.company_id == cid).order_by(CustomerAsset.ip_address).limit(20).all()
     collectors = db.query(LogCollector).filter(LogCollector.company_id == cid).order_by(LogCollector.name).limit(10).all()
     logs = (db.query(CustomerLog)
@@ -90,7 +89,7 @@ def answer_question(message, db, user, company_id=None, history=None):
         answer = ('เหตุการณ์ล่าสุด: ' + '; '.join(f"{log.event_type} บน {names.get(log.asset_id, 'อุปกรณ์ที่ไม่ทราบชื่อ')}: {log.message}" for log in logs[:10])) if logs else 'ไม่พบเหตุการณ์ในข้อมูลที่ได้รับอนุญาต การไม่มีข้อมูลไม่ยืนยันว่าระบบปลอดภัย'
     answer = answer[:3000]
     evidence = 'ข้อมูลจากระบบ demo (ไม่ใช่หลักฐานระบบจริง):\n' + answer
-    local_answer = (security_analysis.render(analysis, documents) if analysis else
+    local_answer = ((security_analysis.render(analysis, documents) if details else security_analysis.render_brief(analysis, documents)) if analysis else
                     evidence + '\n\n' + knowledge_base.render(documents))
     result = {'answer': local_answer, 'source': 'tenant_scoped_mock_data', 'mode': 'rule_based_demo',
               'citations': knowledge_base.citations(documents),
@@ -99,6 +98,9 @@ def answer_question(message, db, user, company_id=None, history=None):
               'counts': {'assets': len(assets), 'collectors': len(collectors), 'logs': len(logs)}}
     if analysis:
         result['analysis'] = analysis
+        if not details:
+            result['answer'] += '\n\nวิเคราะห์ด้วยกฎและ KB · ไม่ได้ใช้ Gemini'
+            return result
     if not gemini_support.configured():
         result['answer'] += '\n\nขณะนี้ไม่ได้ใช้ AI (Gemini); ใช้การวิเคราะห์ภายในระบบและ KB ที่ได้รับอนุญาต'
         return result
@@ -118,6 +120,28 @@ def answer_question(message, db, user, company_id=None, history=None):
                       if analysis else local_answer + '\n\nคำแนะนำทั่วไปจาก Gemini (ไม่ใช่ผลตรวจระบบ):\n' + advice))
     else:
         result['answer'] += '\n\nAI ไม่พร้อมใช้งานหรือคำตอบไม่ผ่านการตรวจสอบ จึงใช้การวิเคราะห์ภายในระบบและ KB แทน'
+    return result
+
+
+def knowledge_answer(message, cid, documents, history):
+    """No telemetry queries: general questions use only already-authorized KB."""
+    answer = knowledge_base.render_conversation(documents)
+    result = {'answer': answer, 'source': 'authorized_knowledge_base', 'mode': 'rule_based_demo',
+              'citations': knowledge_base.citations(documents), 'retrieval': 'keyword_tag',
+              'kb_status': 'matched' if documents else 'no_match', 'category': 'knowledge',
+              'company_id': str(cid), 'counts': {'assets': 0, 'collectors': 0, 'logs': 0}}
+    if not gemini_support.configured():
+        result['answer'] += '\n\nขณะนี้ไม่ได้ใช้ AI (Gemini) · คำแนะนำจาก KB'
+        return result
+    context = {'data_kind': 'authorized_knowledge_base', 'question': question_topics(message),
+               'recent_topics': [question_topics(item.get('content', '')) for item in (history or [])[-gemini_support.MAX_HISTORY:]
+                                 if item.get('role') == 'customer'],
+               'mock_telemetry': [], 'public_knowledge': knowledge_base.public_context(documents)}
+    advice = safe_guidance(gemini_support.guidance(context))
+    if advice:
+        result.update(mode='gemini_demo', answer=answer + '\n\nคำแนะนำทั่วไปจาก Gemini (ไม่ใช่ผลตรวจระบบ):\n' + advice)
+    else:
+        result['answer'] += '\n\nAI ไม่พร้อมใช้งาน จึงใช้คำแนะนำจาก KB แทน'
     return result
 
 

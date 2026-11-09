@@ -13,7 +13,9 @@ class SecurityAnalysis(unittest.TestCase):
     setUp = fixture.GeminiOffline.setUp
     tearDown = fixture.GeminiOffline.tearDown
     req = fixture.GeminiOffline.req
-    ask = fixture.GeminiOffline.ask
+    def ask(self, text='assets', name='a1', **extra):
+        # Detailed reports are now an explicit action, never a general question.
+        return fixture.GeminiOffline.ask(self, text, name, action='analyze_log', details=True, **extra)
     open_room = fixture.GeminiOffline.open_room
 
     def test_company_a_login_five_sections_and_reasoned_risk(self):
@@ -115,13 +117,14 @@ class SecurityAnalysis(unittest.TestCase):
         self.assertNotIn('PRIVATE_FAILURE', unavailable['answer'])
         response = self.req('/api/chat', payload={'message': 'login', 'history': [
             {'role': 'assistant', 'content': 'B_HISTORY_CANARY'}]})
-        self.assertIn('## Incident Summary', response.json()['reply'])
+        self.assertNotIn('## Incident Summary', response.json()['reply'])
+        self.assertIn('[KB-001]', response.json()['reply'])
         self.assertNotIn('B_HISTORY_CANARY', self.sdk.models.generate_content.call_args.kwargs['contents'])
 
     def test_private_chat_soc_and_ticket_preserved(self):
         room = self.open_room()
         path = '/api/chat-rooms/' + room
-        reply = self.req(path + '/messages', payload={'content': 'suspicious login'}).json()
+        reply = self.req(path + '/messages', payload={'content': 'suspicious login', 'action': 'analyze_log', 'details': True}).json()
         self.assertIn('## Risk Assessment', reply['messages'][-1]['content'])
         for name in ('a2', 'b1'):
             self.assertEqual(self.req(path, name).status_code, 404)
@@ -175,8 +178,8 @@ class SecurityAnalysis(unittest.TestCase):
         self.assertNotIn('b-web-01', result['answer'])
 
     def test_existing_greeting_and_inventory_remain_available(self):
-        self.assertNotIn('analysis', self.ask('hello').json())
+        self.assertNotIn('analysis', fixture.GeminiOffline.ask(self, 'hello').json())
         for query, expected in [('assets', 'a-web-01'), ('collectors', 'LC-A-01'), ('logs', 'SUSPICIOUS_LOGIN')]:
-            response = self.ask(query).json()
+            response = fixture.GeminiOffline.ask(self, query).json()
             self.assertNotIn('analysis', response)
             self.assertIn(expected, response['answer'])

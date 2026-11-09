@@ -25,7 +25,7 @@ class AIEvaluation(unittest.TestCase):
     open_room = fixture.GeminiOffline.open_room
 
     def evaluate(self, scenario, question, category='logs', topic='account_security',
-                 mode='gemini_demo', name='a1', records=5, **extra):
+                 mode='gemini_demo', name='a1', records=0, **extra):
         started = time.perf_counter()
         response = self.ask(question, name=name, **extra)
         elapsed = (time.perf_counter() - started) * 1000
@@ -33,13 +33,14 @@ class AIEvaluation(unittest.TestCase):
         result = response.json()
         self.assertEqual(result['mode'], mode)
         self.assertEqual(result['company_id'], str(self.companies['A']))
-        self.assertEqual(result['category'], category)
+        self.assertEqual(result['category'], 'knowledge')
+        self.assertNotIn('analysis', result)
         self.assertNotIn('b-web-01', result['answer'])
         self.assertNotIn('198.51.100.10', result['answer'])
         self.sdk.models.generate_content.assert_called_once()
         args = self.sdk.models.generate_content.call_args.kwargs
         context = json.loads(args['contents'])
-        self.assertEqual(context['data_kind'], 'verified_static_demo_telemetry')
+        self.assertEqual(context['data_kind'], 'authorized_knowledge_base')
         self.assertEqual(context['question']['category'], category)
         self.assertIn(topic, context['question']['topics'])
         self.assertEqual(len(context['mock_telemetry']), records)
@@ -50,11 +51,7 @@ class AIEvaluation(unittest.TestCase):
             self.assertNotIn(forbidden, args['contents'])
         if mode == 'gemini_demo':
             self.assertIn('คำแนะนำทั่วไปจาก Gemini (ไม่ใช่ผลตรวจระบบ)', result['answer'])
-            if 'analysis' in result:
-                self.assertIn('## Evidence & Findings', result['answer'])
-                self.assertIn('not confirmation of compromise', result['answer'])
-            else:
-                self.assertIn('ข้อมูลจากระบบ demo (ไม่ใช่หลักฐานระบบจริง)', result['answer'])
+            self.assertNotIn('## Incident Summary', result['answer'])
         # Measurements are not verdicts; unittest also checks scenario assertions below.
         print(f'MEASURE {scenario}: source={mode}; mocked_asgi_ms={elapsed:.2f}', flush=True)
         return result, context
@@ -68,7 +65,8 @@ class AIEvaluation(unittest.TestCase):
         answer = response.json()['messages'][-1]
         self.assertEqual(answer['role'], 'assistant')
         self.assertIn('คำแนะนำทั่วไปจาก Gemini', answer['content'])
-        self.assertIn('SUSPICIOUS_LOGIN', answer['content'])
+        self.assertIn('[KB-001]', answer['content'])
+        self.assertNotIn('a-web-01', answer['content'])
         self.sdk.models.generate_content.assert_called_once()
         context = json.loads(self.sdk.models.generate_content.call_args.kwargs['contents'])
         self.assertIn('account_security', context['question']['topics'])
@@ -81,7 +79,7 @@ class AIEvaluation(unittest.TestCase):
 
     def test_02_brute_force(self):
         result, context = self.evaluate('brute_force', 'brute-force login ล้มเหลวหลายครั้ง')
-        self.assertIn('SUSPICIOUS_LOGIN', result['answer'])
+        self.assertIn('[KB-001]', result['answer'])
         self.assertNotIn('brute-force', json.dumps(context))  # raw wording is not sent
 
     def test_03_phishing(self):
@@ -95,7 +93,7 @@ class AIEvaluation(unittest.TestCase):
                                         category='assets', topic='security_support')
         self.assertNotIn('203.0.113.77', json.dumps(context))
         self.assertNotIn('203.0.113.77', result['answer'])
-        self.assertIn('a-web-01', result['answer'])
+        self.assertNotIn('a-web-01', result['answer'])
 
     def test_06_insufficient_evidence(self):
         # Only this test's in-memory synthetic records are changed.
@@ -107,7 +105,7 @@ class AIEvaluation(unittest.TestCase):
         self.sdk.models.generate_content.return_value.text = (
             'หลักฐานจำลองยังไม่เพียงพอ ควรให้ SOC ตรวจสอบเพิ่มเติมก่อนสรุปเหตุการณ์')
         result, context = self.evaluate('insufficient_evidence', 'มีหลักฐาน incident เพียงพอหรือไม่',
-                                        topic='incident_response', records=3)
+                                        topic='incident_response', records=0)
         self.assertFalse(any(row['kind'] == 'event' for row in context['mock_telemetry']))
         self.assertNotIn('UNVERIFIED_SYNTHETIC_LOG', json.dumps(context))
         self.assertIn('หลักฐานจำลองยังไม่เพียงพอ', result['answer'])
@@ -124,7 +122,7 @@ class AIEvaluation(unittest.TestCase):
     def test_08_gemini_unavailable(self):
         self.sdk.models.generate_content.side_effect = httpx.ReadTimeout('synthetic-secret timeout')
         result, _ = self.evaluate('gemini_unavailable', 'suspicious login', mode='rule_based_demo')
-        self.assertIn('SUSPICIOUS_LOGIN', result['answer'])
+        self.assertIn('[KB-001]', result['answer'])
         self.assertNotIn('synthetic-secret', result['answer'])
 
     def test_09_invalid_output(self):

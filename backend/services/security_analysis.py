@@ -190,3 +190,21 @@ def render(analysis, documents, advice=None):
         ('Missing Information', '\n'.join('- ' + m for m in analysis['missing_information'])),
     ]
     return '\n\n'.join('## ' + title + '\n' + body for title, body in sections)
+
+
+def render_brief(analysis, documents):
+    """Customer summary; raw IDs, timestamps and records require explicit details."""
+    findings = analysis['findings']
+    risk = {'UNKNOWN': 'ยังประเมินไม่ได้', 'MEDIUM': 'ปานกลาง', 'HIGH': 'สูง'}[analysis['risk']['level']]
+    evidence = [f"- {safe(f['event_type'])} บน {safe(f['hostname'])}" for f in findings[:3]]
+    if not evidence:
+        evidence = ['- ไม่พบ Log ที่สัมพันธ์ในขอบเขตที่ค้นหา การไม่มีข้อมูลไม่ยืนยันว่าระบบปลอดภัย']
+    summary = f"พบ {len(findings)} Log ที่ตรงกับเงื่อนไขค้นหา ยังไม่ยืนยันการบุกรุก"
+    if analysis['truncated']:
+        summary += ' (ผลค้นหาจำกัด 100 รายการ)'
+    return ('## สรุปการวิเคราะห์ Log\n' + summary + '\n\n'
+            + '**ความเสี่ยงเบื้องต้น:** ' + risk + ' (' + analysis['risk']['level'] + ')\n\n'
+            + '**หลักฐานที่พบในระบบ:**\n' + '\n'.join(evidence) + '\n\n'
+            + '**ข้อสันนิษฐาน — ยังไม่ยืนยัน:** ' + analysis['hypotheses'][0] + '\n\n'
+            + '**ขั้นตอนถัดไป:**\n' + '\n'.join('- ' + a for a in analysis['recommendations'][:3])
+            + knowledge_base.reference_lines(documents))

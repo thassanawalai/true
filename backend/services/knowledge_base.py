@@ -95,3 +95,17 @@ def render(documents):
     return 'ความรู้ประกอบจาก KB (คำแนะนำทั่วไป ไม่ใช่หลักฐานเหตุการณ์):\n' + '\n\n'.join(
         f"[{d['id']}] {d['title']}\n{d['content']}\nแหล่งอ้างอิง: [{d['source']['title']}]({d['source']['url']})"
         for d in documents)
+
+
+def reference_lines(documents):
+    if not documents:
+        return ''
+    return '\n\n### แหล่งอ้างอิง\n' + '\n'.join(
+        f"- [{d['id']}] [{d['source']['title']}]({d['source']['url']})" for d in documents)
+
+
+def render_conversation(documents):
+    if not documents:
+        return ('ยังไม่พบคำแนะนำที่ตรงกับคำถามใน KB ค่ะ ลองระบุเรื่องที่ต้องการทราบ เช่น phishing, MFA หรือ log หาย'
+                '\n\nยังมีหลักฐานไม่เพียงพอที่จะสรุปเหตุการณ์ และการไม่มีข้อมูลไม่ยืนยันว่าระบบปลอดภัย')
+    return documents[0]['content'] + reference_lines(documents)

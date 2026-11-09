@@ -15,7 +15,7 @@ function Chat({ companyId, companyName, internal }) {
   const messageEnd = useRef(null);
   useEffect(() => { messageEnd.current?.scrollIntoView({ block: 'nearest' }); }, [messages, busy]);
   useEffect(() => () => controller.current?.abort(), []);
-  const send = async (question = input) => {
+  const send = async (question = input, action = 'knowledge', details = false) => {
     const message = question.trim();
     if (!message || pending.current || (internal && !companyId)) return;
     pending.current = true;
@@ -25,23 +25,23 @@ function Chat({ companyId, companyName, internal }) {
     try {
       const result = await api('/customer-data/ask', {
         method: 'POST', signal: controller.current.signal,
-        body: JSON.stringify({ message, ...(internal ? { company_id: companyId } : {}) }),
+        body: JSON.stringify({ message, action, details, ...(internal ? { company_id: companyId } : {}) }),
       });
-      setMessages(previous => [...previous, { role: 'assistant', content: result.answer }]);
+      setMessages(previous => [...previous, { role: 'assistant', content: result.answer, question: message }]);
     } catch (error) {
       if (error.name !== 'AbortError') { setError(error.message); setInput(message); }
     } finally { pending.current = false; setBusy(false); }
   };
   const disabled = busy || (internal && !companyId);
   const suggestions = [
-    'What IP addresses belong to this company?',
-    'Show recent security alerts.',
-    'Are there suspicious login events?',
-    "Summarize this company's security logs.",
+    'phishing คืออะไร และควรรับมืออย่างไร',
+    'MFA ช่วยป้องกันบัญชีอย่างไร',
+    'suspicious login ควรตรวจสอบอะไร',
+    'log หายควรทำอย่างไร',
   ];
   return <main className="security-insights">
     <div><h2 className="text-xl font-bold">Security Insights</h2>
-      <p className="text-sm text-slate-400 mt-1">Ask questions about a selected company's security information.</p>
+      <p className="text-sm text-slate-400 mt-1">ถามความรู้ด้านความปลอดภัยจาก KB หรือกดวิเคราะห์ Log ของบริษัทที่เลือก</p>
       <p className="insights-company">{companyId ? companyName : 'Select a company to begin'}</p>
     </div>
     <div className="insights-suggestions" aria-label="Suggested questions">
@@ -51,7 +51,7 @@ function Chat({ companyId, companyName, internal }) {
       {!messages.length && <p className="text-sm text-slate-400">{companyId ? 'Choose a suggested question or ask your own. This conversation stays separate from customer conversations.' : 'Choose a company above to explore its security information.'}</p>}
       {messages.map((message, index) => <article key={index} className={'chat-bubble ' + (message.role === 'user' ? 'chat-customer' : 'chat-assistant')}>
         <p className="chat-sender">{message.role === 'user' ? <UserRound size={16}/> : <Bot size={16}/>} {message.role === 'user' ? 'You' : 'SOC Assistant'}</p>
-        <ChatAnswer content={message.content}/>
+        <ChatAnswer content={message.content} disabled={disabled} canAnalyze={message.role === 'assistant'} onAnalyze={message.role === 'assistant' ? details => send(message.question, 'analyze_log', details) : undefined}/>
       </article>)}
       {busy && <p role="status" className="text-sm text-blue-300">Reviewing {companyName}'s security information…</p>}
       <div ref={messageEnd}/>

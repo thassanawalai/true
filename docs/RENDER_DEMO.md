@@ -85,5 +85,19 @@ minimal runtime without the unused Torch/vector stack.
    after idle and explain that temporary chats expire. Never present live Gemini
    as verified when GEMINI_ENABLED is false.
 
+## Chat behavior
+
+General questions default to a concise Thai answer from the top authorized KB
+match, without querying assets, collectors or customer logs. Existing explicit
+inventory commands (`logs`, `events`, `assets`, `collectors`) remain available.
+The วิเคราะห์ Log button sends `action: "analyze_log"` with the original question;
+private chat accepts no company ID and resolves scope from the signed user.
+Internal Q&A retains its existing authorized company selector. Summary replies
+show at most three evidence items and three next steps. The technical-details
+button explicitly sends `details: true`; a details flag alone does not analyze.
+KB links are secondary, and creating a ticket still requires customer confirmation.
+Gemini remains disabled in the Render configuration; the brief analysis uses
+existing local rules. No database or migration change is needed for this UX.
+
 References: https://render.com/docs/free, https://render.com/docs/docker,
 https://render.com/docs/deploys, https://render.com/docs/health-checks.

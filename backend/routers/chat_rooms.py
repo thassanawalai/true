@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 from time import monotonic
 from uuid import UUID, uuid4
+from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
@@ -20,6 +21,8 @@ router = APIRouter(prefix='/api/chat-rooms', tags=['Private Chat'])
 class MessageInput(BaseModel):
     model_config = ConfigDict(extra='forbid')
     content: str = Field(min_length=1, max_length=1000)
+    action: Literal['knowledge', 'analyze_log'] = 'knowledge'
+    details: bool = False
 
 
 class LinkInput(BaseModel):
@@ -175,12 +178,13 @@ def send_message(room_id: UUID, payload: MessageInput, db: Session = Depends(get
     try:
         # Never hold the shared store lock over network IO: SOC replies and other
         # rooms continue working while this room waits for Gemini or fallback.
-        answer = answer_question(content, db, user, history=history)
+        answer = answer_question(content, db, user, history=history, action=payload.action, details=payload.details)
         with live.lock:
             db.expire_all()
             saved = durable(db, room_id, user)
             room = saved if saved else temporary(room_id, user)
-            additions = [new_message('customer', user, content), new_message('assistant', None, answer['answer'])]
+            label = ('รายละเอียด Log: ' if payload.details else 'วิเคราะห์ Log: ') if payload.action == 'analyze_log' else ''
+            additions = [new_message('customer', user, label + content), new_message('assistant', None, answer['answer'])]
             return append_messages(db, saved, room, additions)
     finally:
         with live.lock:

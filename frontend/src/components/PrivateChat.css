@@ -97,3 +97,13 @@
   .soc-chat-empty { padding:20px; gap:12px; }
 }
 @media(prefers-reduced-motion:reduce) { .soc-sending span { animation:none; } }
+
+.soc-conversation .chat-answer { line-height:1.85; overflow-wrap:anywhere; }
+.soc-conversation .chat-answer p + p { margin-top:12px; }
+.soc-conversation .chat-answer h2 { font-size:16px; margin:4px 0 12px; }
+.soc-conversation .chat-answer li { margin:6px 0; }
+.chat-citations { color:#9db2cc; font-size:12px; margin-top:16px; }
+.soc-analysis-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:16px; padding-top:12px; border-top:1px solid #30435c; }
+.soc-analysis-actions button { border:1px solid #527caf; border-radius:8px; padding:7px 12px; color:#cce4ff; font-size:13px; }
+.soc-analysis-actions button:hover:not(:disabled) { background:#203956; }
+.soc-analysis-actions small { color:#9db2cc; font-size:12px; }
