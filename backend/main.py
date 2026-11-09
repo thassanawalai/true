@@ -15,11 +15,9 @@ from core.database import Base, engine
 from models import models
 from models import customer_data as customer_data_models  # register demo tables
 from core.deployment import hosted
-from core.demo_gate import DemoAccessGate, settings as gate_settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    gate_settings()
     if hosted():
         import os
         from sqlalchemy import inspect
@@ -53,7 +51,6 @@ async def lifespan(app: FastAPI):
             temporary_chat.rooms.clear()
 
 app = FastAPI(title="SOC AI Support Assistant API", lifespan=lifespan)
-app.add_middleware(DemoAccessGate)
 app.include_router(demo_auth.router)
 app.include_router(tickets.router)
 app.include_router(customer_data.router)

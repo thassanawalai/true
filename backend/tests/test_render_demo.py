@@ -1,23 +1,21 @@
 """Offline deployment contracts. Never connect to Neon or a live provider."""
-import base64
 import importlib.util
 import io
 import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 from datetime import datetime
 from uuid import uuid4
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, UUID, Numeric
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from alembic.autogenerate import compare_metadata
-from core.demo_gate import DemoAccessGate, settings
 from core.database import Base
 import test_gemini_offline as fixture
 
@@ -58,52 +56,61 @@ class AnswerLogIsolation(unittest.TestCase):
             self.sdk.models.generate_content.assert_not_called()
 
 
-class AccessGate(unittest.TestCase):
-    def setUp(self):
-        self.env = patch.dict(os.environ, {'APP_ENV': 'production', 'DEMO_ACCESS_USER': 'reviewer',
-            'DEMO_ACCESS_PASSWORD': 'synthetic-invitation-password-32'})
-        self.env.start(); self.addCleanup(self.env.stop)
-        self.app = FastAPI()
-        self.app.add_middleware(DemoAccessGate)
-        @self.app.get('/healthz')
-        def health(): return {'status': 'ok'}
-        @self.app.get('/api/demo-auth/users')
-        def users(): return ['admin']
-        self.client = TestClient(self.app)
-        self.addCleanup(self.client.close)
+class PublicDemoLogin(unittest.TestCase):
+    setUp = fixture.GeminiOffline.setUp
+    tearDown = fixture.GeminiOffline.tearDown
+    req = fixture.GeminiOffline.req
 
-    def test_all_content_requires_invitation_before_mock_identity(self):
-        for path in ('/', '/assets/app.js', '/docs', '/openapi.json', '/api/demo-auth/users'):
-            for authorization in ('', 'Bearer forged-session', 'Basic !!!', 'Basic Og=='):
-                response = self.client.get(path, headers={'Authorization': authorization})
+    def test_login_shell_and_user_list_are_public_even_with_old_gate_settings(self):
+        import main
+        with tempfile.TemporaryDirectory() as directory:
+            static = Path(directory)
+            html = '<html><body><div id="root">Demo shell</div></body></html>'
+            (static / 'index.html').write_text(html)
+            with patch.object(main, 'STATIC_DIR', static), patch.dict(os.environ, {
+                    'APP_ENV': 'production', 'RENDER': 'true',
+                    'DEMO_ACCESS_USER': 'old-reviewer', 'DEMO_ACCESS_PASSWORD': 'obsolete'}):
+                response = self.client.get('/')
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.text, html)
+                self.assertNotIn('www-authenticate', response.headers)
+                users = self.client.get('/api/demo-auth/users')
+                self.assertEqual(users.status_code, 200)
+                self.assertEqual(len(users.json()), 5)
+                self.assertNotIn('obsolete', users.text)
+                self.assertNotIn('token', users.text)
+
+    def test_mock_login_preserves_roles_and_session_headers(self):
+        from routers.demo_auth import LoginRequest, login
+        for name, role in [('a1', 'CUSTOMER'), ('support', 'SUPPORT'), ('admin', 'ADMIN')]:
+            # SQLite's native UUID binder requires UUID objects; PostgreSQL accepts
+            # the endpoint's string IDs. Exercise login with the fixture's UUID.
+            with self.Session() as db:
+                response = login(LoginRequest.model_construct(user_id=self.users[name]), db)
+            self.assertEqual(response['user']['role'], role)
+            for header in ('Authorization', 'X-Demo-Authorization'):
+                me = self.client.get('/api/demo-auth/me',
+                    headers={header: 'Bearer ' + response['token']})
+                self.assertEqual(me.status_code, 200)
+                self.assertEqual(me.json()['id'], str(self.users[name]))
+        self.assertEqual(self.req('/api/demo-auth/companies', 'a1').status_code, 403)
+
+    def test_protected_apis_still_require_mock_session_without_basic_challenge(self):
+        for path in ('/api/demo-auth/me', '/api/customer-data/assets',
+                     '/api/customer-data/logs', '/api/chat-rooms', '/api/tickets'):
+            for headers in ({}, {'Authorization': 'Basic b2xkOm9sZA=='},
+                            {'X-Demo-Authorization': 'Bearer invalid'}):
+                response = self.client.get(path, headers=headers)
                 self.assertEqual(response.status_code, 401)
-                self.assertIn('Basic', response.headers['www-authenticate'])
-        self.assertEqual(self.client.post('/api/demo-auth/login', json={'user_id': 'admin'}).status_code, 401)
-        self.assertEqual(self.client.get('/healthz').status_code, 200)
-
-    def test_correct_invitation_and_fail_closed_configuration(self):
-        response = self.client.get('/api/demo-auth/users', auth=('reviewer', 'synthetic-invitation-password-32'))
-        self.assertEqual(response.json(), ['admin'])
-        with patch.dict(os.environ, {'DEMO_ACCESS_PASSWORD': ''}):
-            self.assertEqual(self.client.get('/api/demo-auth/users').status_code, 503)
-            with self.assertRaises(ValueError): settings()
-
-    def test_browser_basic_auth_and_application_session_coexist(self):
-        f = fixture.GeminiOffline(); f.setUp()
-        try:
-            headers = {'Authorization': 'Basic ' + base64.b64encode(b'reviewer:synthetic-invitation-password-32').decode(),
-                       'X-Demo-Authorization': 'Bearer ' + f.tokens['a1']}
-            self.assertEqual(f.client.get('/api/demo-auth/me', headers=headers).status_code, 200)
-            headers.pop('X-Demo-Authorization')
-            self.assertEqual(f.client.get('/api/demo-auth/me', headers=headers).status_code, 401)
-        finally: f.tearDown(); f.doCleanups()
+                self.assertNotIn('Basic', response.headers.get('www-authenticate', ''))
+        self.sdk.models.generate_content.assert_not_called()
 
 
 class DeploymentConfiguration(unittest.TestCase):
     def test_hosted_startup_validates_schema_without_create_all(self):
         import main
-        with patch.dict(os.environ, {'APP_ENV': 'production', 'DEMO_ACCESS_USER': 'reviewer',
-                'DEMO_ACCESS_PASSWORD': 'synthetic-invitation-password-32',
+        with patch.dict(os.environ, {'APP_ENV': 'production', 'DEMO_ACCESS_USER': '',
+                'DEMO_ACCESS_PASSWORD': '',
                 'DEMO_SESSION_SECRET': 'synthetic-session-secret-at-least-32'}), \
                 patch.object(main, 'STATIC_DIR', ROOT.parent / 'frontend/dist'), \
                 patch('sqlalchemy.inspect') as inspector, \
@@ -113,7 +120,8 @@ class DeploymentConfiguration(unittest.TestCase):
                 inspector.return_value.get_table_names.return_value = list(Base.metadata.tables)
                 with TestClient(main.app) as client:
                     self.assertEqual(client.get('/healthz').status_code, 200)
-                    self.assertEqual(client.get('/api/demo-auth/users').status_code, 401)
+                    self.assertEqual(client.head('/healthz').status_code, 200)
+                    self.assertEqual(client.get('/openapi.json').status_code, 200)
                 inspector.return_value.get_table_names.return_value = []
                 with self.assertRaisesRegex(RuntimeError, 'schema is incomplete'):
                     with TestClient(main.app): pass

@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 sys.dont_write_bytecode = True
 os.environ.update(DATABASE_URL='sqlite://', PYTHON_DOTENV_DISABLED='1',
-                  APP_ENV='test', RENDER='false', DEMO_ACCESS_USER='', DEMO_ACCESS_PASSWORD='',
+                  APP_ENV='test', RENDER='false',
                   GEMINI_ENABLED='false', GEMINI_API_KEY='offline-runner-fake-key',
                   GEMINI_MODEL='offline-model', DEMO_SESSION_SECRET='offline-runner-secret-at-least-32-characters')
 backend = Path(__file__).resolve().parents[1]

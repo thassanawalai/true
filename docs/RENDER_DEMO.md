@@ -6,12 +6,11 @@ are performed by this preparation. Do not add a Render database.
 
 ## Access and persistence
 
-The browser first prompts for HTTP Basic invitation credentials. Only then can
-an operator select a mock customer, SUPPORT or ADMIN. Everyone who receives the
-invitation is trusted to use every mock role. Share it only with demo reviewers,
-not general visitors; use synthetic customer data. Application Logout clears the
-mock session, not the browser's cached Basic credentials. Close the private
-browser session to leave the invitation gate; rotate the password to revoke it.
+Visitors reach the existing SOC AI Support Demo Login page directly, without an
+HTTP Basic prompt. The mock picker allows any visitor to select a demo customer,
+SUPPORT or ADMIN. Use only synthetic demo data; this is not production identity
+verification. API requests still require a signed mock session, with existing
+role, company and private-room authorization. Application Logout clears that session.
 
 Render Free sleeps after 15 idle minutes and wakes on a request (roughly one
 minute). RAM-only unticketed chats disappear on sleep/restart/redeploy. Tickets
@@ -60,10 +59,11 @@ Set these **runtime environment variables** in the Dashboard, never in Git:
 |---|---|
 | APP_ENV | production |
 | DATABASE_URL | Existing Neon PostgreSQL pooled URL with TLS parameters |
-| DEMO_ACCESS_USER | Chosen invitation username (no colon) |
-| DEMO_ACCESS_PASSWORD | Unique random secret, at least 24 characters |
-| DEMO_SESSION_SECRET | Different random secret, at least 32 characters |
+| DEMO_SESSION_SECRET | Unique random secret, at least 32 characters |
 | GEMINI_ENABLED | false |
+
+DEMO_ACCESS_USER and DEMO_ACCESS_PASSWORD are no longer used; existing values have
+no effect and can be removed from Render settings.
 
 Render supplies PORT. No VITE API URL is needed. Leave GEMINI_API_KEY and
 GEMINI_MODEL unset for fallback-only operation. Enable Gemini only after explicit
@@ -74,14 +74,14 @@ minimal runtime without the unused Torch/vector stack.
 ## Acceptance before sharing the URL
 
 1. Wait for a successful deploy/health check; visit the onrender.com HTTPS URL.
-2. In a fresh private browser, verify the invitation challenge appears before
-   UI, demo-user list, login, docs or API access. Wrong credentials must fail.
-3. After invitation authentication, verify A1/A2/B1 and SOC flows. The browser
-   carries Basic authentication; the React client sends the mock session in
-   X-Demo-Authorization. A mock token alone must not bypass the invitation gate.
+2. In a fresh private browser, verify the Demo Login page and demo-user list load
+   directly without an HTTP Basic challenge. Verify GET/HEAD /healthz succeeds.
+3. Select A1/A2/B1 and SOC identities through the existing login page. The React
+   client sends the signed mock session in X-Demo-Authorization. Protected APIs
+   must still reject requests without a valid mock session.
 4. Verify Thai fallback/citations, private rooms, SOC reply, explicit ticket
    creation and cross-company denials. Confirm linked tickets survive restart.
-5. Open from a second device and verify the same URL/gate. Verify automatic wake
+5. Open from a second device and verify the same URL/login page. Verify automatic wake
    after idle and explain that temporary chats expire. Never present live Gemini
    as verified when GEMINI_ENABLED is false.
 
