@@ -74,7 +74,12 @@ def answer_question(message, db, user, company_id=None, history=None):
                     or security_analysis.classify(message)[0] != 'unknown_security_issue') else None)
     assets = db.query(CustomerAsset).filter(CustomerAsset.company_id == cid).order_by(CustomerAsset.ip_address).limit(20).all()
     collectors = db.query(LogCollector).filter(LogCollector.company_id == cid).order_by(LogCollector.name).limit(10).all()
-    logs = db.query(CustomerLog).filter(CustomerLog.company_id == cid).order_by(CustomerLog.occurred_at.desc()).limit(20).all()
+    logs = (db.query(CustomerLog)
+            .join(CustomerAsset, CustomerLog.asset_id == CustomerAsset.id)
+            .join(LogCollector, CustomerLog.collector_id == LogCollector.id)
+            .filter(CustomerLog.company_id == cid, CustomerAsset.company_id == cid,
+                    LogCollector.company_id == cid)
+            .order_by(CustomerLog.occurred_at.desc()).limit(20).all())
     names = {asset.id: asset.hostname for asset in assets}
     kind = question_topics(message)['category']
     if kind == 'collectors':

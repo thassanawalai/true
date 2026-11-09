@@ -238,7 +238,7 @@ Specify a deterministic matrix using available evidence (e.g., asset criticality
 |---|---|---|---|
 | 1 — Freeze & Verify | Record commit, backup, run backend/frontend tests, smoke-test A/B | Reproducible baseline, test log, rollback path | Pending independent verification |
 | 2 — Gemini Integration | Backend-only Gemini, structured output, validator, fallback | Real inference verified on synthetic cases; regression passes | Not started/verified |
-| 3 — Research Evaluation | Freeze dataset/rubric; run both methods | Machine-readable results, comparison, limitations | Not completed |
+| 3 — Research Evaluation | Freeze dataset/rubric; run both methods | Machine-readable results, comparison, limitations | Harness/mock verification complete; live comparison and expert review pending (CR-20261104-03) |
 | 4 — Report & Defense | Align report, figures, demo, Q&A with measured findings | Demo and report make only supported claims | In progress |
 
 ### Working timeline (subject to confirmation)
@@ -404,6 +404,153 @@ Frontend check from `frontend/` used the existing Vite config with
 6. Coordinate any Git-history cleanup separately with repository collaborators;
    rotation remains necessary even if history is later rewritten. Record completion
    and verification only after these actions actually succeed.
+
+### CR-20261104-02 — Independent synthetic Gemini incident-analysis method
+
+- **Authorization:** Explicit Phase 2 request from project developer. Approved scope:
+  independent Method B, synthetic-only evidence, strict validation, fallback,
+  comparison metadata and regression tests; no redesign or expanded ITSM scope.
+- **Baseline:** `cd6a5e9` on `feature/ai-kb-phase-ab`. The Method A analyzer,
+  classification/extraction/correlation/risk rules and existing support-answer path
+  are unchanged. Existing chat/frontend behavior continues using its original path.
+- **Interface:** `POST /api/customer-data/analyze-case`, authenticated with existing
+  demo bearer or `X-Demo-Authorization` header. Body example:
+  `{"case_id":"a-login","method":"B"}`. Use `"method":"A"` for baseline.
+  Internal staff must supply `company_id`; customers cannot select another tenant.
+  The case must belong to the authorized company's demo identity. Unknown/foreign
+  cases return 404; client-supplied question/evidence/history/synthetic flags are rejected.
+- **Reviewed synthetic catalog v1:** `a-login`, `a-no-evidence` for Company A (Demo);
+  `b-scan`, `b-no-evidence` for Company B (Demo). These are four smoke cases, not
+  the planned 30-case benchmark or independently adjudicated ground truth.
+  Packages are generated solely from source-controlled synthetic fixtures, stable
+  synthetic UUIDs/timestamps, fixed questions, and digest-approved public KB.
+  No runtime customer assets/logs, private KB, secrets or chat history are exported.
+  Adding cases requires code review; callers cannot self-declare real data synthetic.
+- **Comparability:** `services.incident_experiment.run_case(case_id, method)` is the
+  trusted Python evaluation interface. Both methods use the same versioned input
+  snapshot and return `input_sha256`; equality must be checked in evaluation.
+  A runs its frozen SQL analyzer in isolated in-memory SQLite populated from that
+  snapshot. B receives the snapshot directly and does NOT receive A predictions,
+  classification, findings, or risk. B independently selects incident class,
+  supporting evidence, risk, ordered actions and uncertainty. No A execution occurs
+  on B success. On B failure only, A supplies a separately labeled fallback.
+- **Output/validation:** Required JSON fields are `incident_type`, `risk_level`,
+  `summary`, `evidence_ids`, `recommended_actions`, `uncertainty`. Pydantic strict
+  validation forbids extra fields and wrong types; duplicate JSON keys, unknown or
+  repeated evidence IDs, incompatible event/class pairs and risk-policy violations
+  fail validation. Only authorized log IDs are factual incident references; public
+  KB IDs are contextual guidance, never proof that an incident occurred.
+- **Claim boundary (intentional research limitation):** Factual summary is extractive:
+  the model must concatenate the supplied factual sentences for its selected log IDs.
+  Actions and uncertainty must come from reviewed options. Any additional claim,
+  ownership assertion, invented fact or action-completed claim is rejected rather
+  than checked using an unreliable natural-language heuristic. This is constrained
+  model-driven analysis/evidence selection, not unconstrained narrative generation.
+  Novel hypothesis/prose quality is therefore not measured by this implementation;
+  action relevance and classification quality still require independent evaluation.
+- **Risk policy v1:** Same provisional formula as baseline: no supporting findings
+  means UNKNOWN; supported ransomware/exfiltration means HIGH; other supported
+  incident classes mean MEDIUM. B applies this formula to its own selected evidence,
+  A to its rule-correlated evidence. Differences in evidence selection can produce
+  differences in risk; the validator never silently substitutes A's risk for B's.
+  These levels are not calibrated operational severity measurements.
+- **Provider:** Reuses existing API-key client, fixed endpoint, no tools, bounded
+  worker pool, 15-second HTTP timeout, 16-second overall wait and one attempt.
+  Structured path uses JSON schema, a separate versioned prompt, 2,048 output-token
+  cap, 20,000-character context cap and 12,000-character output cap. Existing plain
+  advice provider remains unchanged. Settings remain `GEMINI_ENABLED`,
+  `GEMINI_API_KEY`, `GEMINI_MODEL`; no new dependency/service is added.
+- **Metadata:** Responses record requested `method`, `effective_method`, `status`,
+  `fallback`, `validation_failures`, `latency_ms`, `run_id`, `model`, `prompt_version`,
+  `baseline_commit`, case ID and input hash. Failed B has `status="fallback"`,
+  `analysis=null`, and `fallback_analysis` containing A; never score it as B success.
+  Raw invalid model output and provider exception text are not returned or logged.
+  Evaluation tooling may save these synthetic responses later; no persistence or
+  evaluation artifacts were added. Latency includes snapshot preparation, validation
+  and fallback where applicable; A also includes in-memory database setup, so this
+  is wrapper end-to-end latency, not a pure inference-speed comparison.
+- **Verified:** PASS — 71 offline tests (64 baseline + 7 Phase 2), using mocked SDK
+  and blocked outbound sockets. Includes A/B input identity, independent B execution,
+  A/B tenants, missing evidence, private/runtime-data exclusion, malformed/schema/
+  unsupported-claim outputs, disabled/unavailable/timeout/truncated responses and
+  pool/context limits. PASS — in-memory Python compilation, baseline source diff, and frontend production
+  build in memory (2,146 modules).
+- **Not claimed:** Live Gemini inference, new PostgreSQL integration run, benchmark
+  scores, superiority to Method A, or completion of Phase 2 live-inference exit
+  criteria. No demo database mutations or live credential changes were performed.
+- **Reproduce:** From repository root run
+  `PYTHONWARNINGS=ignore backend/.venv/bin/python -B backend/scripts/test_phase_ab_offline.py`.
+  For a synthetic live check after configuring the existing provider, call the
+  authenticated endpoint with one of the four case IDs and inspect `status`,
+  `effective_method` and `validation_failures`; a fallback is not successful inference.
+
+### CR-20261104-03 — Minimal reproducible research evaluation
+
+- **Authorization:** Explicit Phase 3 request from the developer; limited to synthetic
+  cases, independent annotations, evaluation/export tooling and focused tests.
+- **Corpus:** Exactly 30 evaluation cases in `backend/evaluation/cases_v1.json`,
+  separate from the four unchanged Phase 2 smoke cases. Distribution: six each of
+  login, scanning, malware-related, benign/adjudicated and uncertain scenarios;
+  15 per synthetic tenant. This supersedes the original proposed category counts
+  for the minimal corpus, to meet the request for malware and benign coverage.
+- **Annotations:** Scenario-authored incident labels, expected risk, evidence IDs
+  and rationale were specified before A/B execution, never copied from predictions.
+  No human SOC review has yet been performed; this is not independent expert
+  adjudication. Mapping and annotation criteria are documented in
+  `backend/evaluation/README.md`. Brute force maps to suspicious_login; benign and
+  uncertain risk uses UNKNOWN because neither method has a LOW/BENIGN risk output.
+  Confirmed benign/adjudicated alerts are not unresolved supporting incident evidence.
+- **Freeze/privacy:** Approved dataset digest is pinned in `evaluation/catalog.py`;
+  edits fail closed pending review. Only the package is sent to a method, never
+  ground truth. No runtime customer data/private KB/history is loaded. This corpus
+  keeps public KB empty as a controlled condition. Existing KB behavior is unchanged.
+- **Comparability:** Runner reuses `run_case` and checks both methods against the
+  same expected `input_sha256`. A hash mismatch aborts. Method A rules and Method B
+  validation/risk policy are unchanged; the experiment service only registers the
+  reviewed catalog and resolves its packages. Results record implementation hashes.
+- **Metrics:** Successful-prediction classification/risk agreement with explicit
+  denominators, coverage-aware classification yield, micro evidence P/R/F1 and
+  exact-set agreement; aggregate and per-category JSON breakdowns. Empty
+  denominators are null. Unsupported claims are an explicitly limited structural
+  log-reference/summary check, with separate raw/displayed counters. It is not a
+  human semantic or action-quality score. Raw malformed results are unscorable,
+  not assigned perfect grounding. Finite synthetic foreign-tenant identifier
+  checks cover model context, displayed output and raw output separately; these
+  are not a substitute for the separate authenticated endpoint regression tests.
+  Median/P95 wrapper latency includes SQLite setup and fallback, not pure inference.
+- **Failure accounting:** Successful B, validation_failure, timeout, provider
+  fallback, execution_error and skipped are distinct. A fallback result is retained
+  only as labeled provenance, never scored as a successful B prediction. Baseline-only
+  mode skips B. Mock B reads only inputs, ignores some semantics deliberately, and
+  injects four failures to verify accounting. Mock metrics are software tests only.
+- **Exports:** Runner writes CSV, JSON and Markdown into a new directory only.
+  Verified mock artifacts: `docs/evidence/research-mock-v1/results.json`,
+  `results.csv`, `summary.md`. Each carries mock labeling; model credentials and
+  unvalidated model text are not exported. No live model was called.
+- **Verified on 2026-11-04:** PASS — 77 offline tests (71 existing + 6 evaluation
+  tests). PASS — mock evaluation exported 60 rows for exactly 30 cases, with
+  matching A/B input hashes. A: 30 successful executions; mock B: 26 successful,
+  2 validation failures, 1 timeout, 1 provider fallback. These are execution counts,
+  not empirical Gemini performance. PASS — in-memory Python compilation and
+  whitespace checks. Method A source remains unchanged from `cd6a5e9`.
+- **Live gate:** CLI requires `--mode live --enable-live` AND explicitly exported
+  `GEMINI_ENABLED=true`, `GEMINI_API_KEY`, `GEMINI_MODEL`; otherwise it refuses.
+  It does not load `.env`. Offline modes disable Gemini and block network sockets.
+  No demo DB writes, migrations, frontend changes, staging or Git history changes.
+- **Remaining:** Live Gemini evaluation is SKIPPED; real A/B performance comparison,
+  reviewer-adjudicated ground truth, confidence analysis and presentation conclusions
+  remain pending. Existing risk policy limitations are measured rather than tuned.
+  No claim that Gemini outperforms rules is supported by mock output.
+
+Reproduce from repository root, using a new output directory on each run:
+
+```bash
+PYTHONWARNINGS=ignore backend/.venv/bin/python -B backend/scripts/test_phase_ab_offline.py
+PYTHONWARNINGS=ignore backend/.venv/bin/python -B backend/scripts/evaluate_research.py --mode mock --output /tmp/soc-eval-mock-run1
+PYTHONWARNINGS=ignore backend/.venv/bin/python -B backend/scripts/evaluate_research.py --mode baseline --output /tmp/soc-eval-baseline-run1
+# Operator only, after securely exporting provider settings; not executed here:
+PYTHONWARNINGS=ignore backend/.venv/bin/python -B backend/scripts/evaluate_research.py --mode live --enable-live --output /tmp/soc-eval-live-run1
+```
 
 ## 16. Known risks and mitigation
 

@@ -1,0 +1,1510 @@
+[
+  {
+    "case_id": "R01",
+    "tenant": "Company A (Demo)",
+    "category": "login",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R01",
+      "data_kind": "approved_synthetic",
+      "question": "Suspicious login on eval-a-web-01",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "ccc1895d-932a-5222-bb3a-c585b52b2123",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "SUSPICIOUS_LOGIN",
+          "message": "Repeated failed authentication",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "e313fc2a-241f-519d-a25f-4cd1e050e11e",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "suspicious_login",
+      "risk_level": "MEDIUM",
+      "evidence_ids": [
+        "ccc1895d-932a-5222-bb3a-c585b52b2123"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R02",
+    "tenant": "Company B (Demo)",
+    "category": "login",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R02",
+      "data_kind": "approved_synthetic",
+      "question": "Failed login on eval-b-web-01 user=alice",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "d81783fa-2c9b-5839-9cf6-37201793d2b5",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "FAILED_LOGIN",
+          "message": "user=alice authentication failed",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "e553485e-0bfa-5d31-855b-14b4d0a9985c",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "suspicious_login",
+      "risk_level": "MEDIUM",
+      "evidence_ids": [
+        "d81783fa-2c9b-5839-9cf6-37201793d2b5"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R03",
+    "tenant": "Company A (Demo)",
+    "category": "login",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R03",
+      "data_kind": "approved_synthetic",
+      "question": "Brute force on eval-a-web-01",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "8ec52673-4069-5442-bc3c-f601fa7dba7c",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "BRUTE_FORCE",
+          "message": "Repeated password guesses",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "8344e2cf-7af5-5a67-a741-6aa7e17d15b5",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "suspicious_login",
+      "risk_level": "MEDIUM",
+      "evidence_ids": [
+        "8ec52673-4069-5442-bc3c-f601fa7dba7c"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R04",
+    "tenant": "Company B (Demo)",
+    "category": "login",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R04",
+      "data_kind": "approved_synthetic",
+      "question": "Suspicious login on eval-b-web-01 2026-11-04T03:00:00Z",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "c5e772ef-580f-5cb8-b828-2d06537df992",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "SUSPICIOUS_LOGIN",
+          "message": "Unexpected authentication failures",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "c89c7f87-2056-5cdb-81e5-ce522d651d17",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "suspicious_login",
+      "risk_level": "MEDIUM",
+      "evidence_ids": [
+        "c5e772ef-580f-5cb8-b828-2d06537df992"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R05",
+    "tenant": "Company A (Demo)",
+    "category": "login",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R05",
+      "data_kind": "approved_synthetic",
+      "question": "Suspicious login on eval-a-web-01 user=bob",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "2e248c47-38ce-56f7-878c-4a385e257fae",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "SUSPICIOUS_LOGIN",
+          "message": "user=alice authentication failed",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "68900e32-842b-535c-85a0-7c0aa8c1649b",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "suspicious_login",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R06",
+    "tenant": "Company B (Demo)",
+    "category": "login",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R06",
+      "data_kind": "approved_synthetic",
+      "question": "Suspicious login on missing-host-99",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "2c0eda24-dd6e-5371-9138-c05e28de9143",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "SUSPICIOUS_LOGIN",
+          "message": "Repeated failed authentication",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "a4a31347-6e0a-5a7d-960f-896e849edbba",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "suspicious_login",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R07",
+    "tenant": "Company A (Demo)",
+    "category": "scan",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R07",
+      "data_kind": "approved_synthetic",
+      "question": "Port scan on eval-a-web-01",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "dcb739e2-e3ae-5cd7-9edc-34927e9f5370",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "PORT_SCAN",
+          "message": "Connections to many destination ports",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "e90a1494-7ab2-5ec3-9956-39b64f294a14",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "port_scan",
+      "risk_level": "MEDIUM",
+      "evidence_ids": [
+        "dcb739e2-e3ae-5cd7-9edc-34927e9f5370"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R08",
+    "tenant": "Company B (Demo)",
+    "category": "scan",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R08",
+      "data_kind": "approved_synthetic",
+      "question": "PORT_SCAN on eval-b-web-01",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "b79ef82b-d5fe-5bcb-95a8-e40886360624",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "PORT_SCAN",
+          "message": "Repeated connection probes",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "81ad7de0-da99-58d4-a3b5-2658bb86f8d0",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "port_scan",
+      "risk_level": "MEDIUM",
+      "evidence_ids": [
+        "b79ef82b-d5fe-5bcb-95a8-e40886360624"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R09",
+    "tenant": "Company A (Demo)",
+    "category": "scan",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R09",
+      "data_kind": "approved_synthetic",
+      "question": "สแกนพอร์ต eval-a-web-01",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "13d50e24-a891-5902-a87b-cc5a749e5b61",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "PORT_SCAN",
+          "message": "Unusual connection attempts",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "c7960365-f78e-5bc5-9bc7-f507d55f53df",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "port_scan",
+      "risk_level": "MEDIUM",
+      "evidence_ids": [
+        "13d50e24-a891-5902-a87b-cc5a749e5b61"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R10",
+    "tenant": "Company B (Demo)",
+    "category": "scan",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R10",
+      "data_kind": "approved_synthetic",
+      "question": "Port scan on eval-b-web-01 2026-11-04",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "29c35dff-68c8-5cb1-9ccf-f52659497606",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "PORT_SCAN",
+          "message": "Unusual connection attempts",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "ff333e2a-2bc9-56d4-81c1-0ff9298cb80e",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "port_scan",
+      "risk_level": "MEDIUM",
+      "evidence_ids": [
+        "29c35dff-68c8-5cb1-9ccf-f52659497606"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R11",
+    "tenant": "Company A (Demo)",
+    "category": "scan",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R11",
+      "data_kind": "approved_synthetic",
+      "question": "Port scan on missing-host-99",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "23e1775a-6f96-50e5-95d5-d796372b8808",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "PORT_SCAN",
+          "message": "Unusual connection attempts",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "e36e3a35-4600-5b73-9272-1f0455369172",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "port_scan",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R12",
+    "tenant": "Company B (Demo)",
+    "category": "scan",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R12",
+      "data_kind": "approved_synthetic",
+      "question": "Port scan on eval-b-web-01 2026-10-01",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "58ba776e-15e0-5431-8f35-6145220c63df",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "PORT_SCAN",
+          "message": "Unusual connection attempts",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "84544170-2ecd-5239-87cd-56719edd9b1c",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "port_scan",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R13",
+    "tenant": "Company A (Demo)",
+    "category": "malware",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R13",
+      "data_kind": "approved_synthetic",
+      "question": "Malware on eval-a-web-01",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "1889ed3e-b498-55de-b6a1-c371cd522c16",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "MALWARE",
+          "message": "EDR detected a suspicious executable",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "cd810d81-3e9c-526d-81a2-4f9a79b9c255",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "malware",
+      "risk_level": "MEDIUM",
+      "evidence_ids": [
+        "1889ed3e-b498-55de-b6a1-c371cd522c16"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R14",
+    "tenant": "Company B (Demo)",
+    "category": "malware",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R14",
+      "data_kind": "approved_synthetic",
+      "question": "Virus detected on eval-b-web-01",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "fb7dd69f-5c2a-58ba-a121-6777e483db5d",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "MALWARE_DETECTED",
+          "message": "Malicious file quarantined",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "e0609ed1-c330-5cca-845b-4f2600076c8b",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "malware",
+      "risk_level": "MEDIUM",
+      "evidence_ids": [
+        "fb7dd69f-5c2a-58ba-a121-6777e483db5d"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R15",
+    "tenant": "Company A (Demo)",
+    "category": "malware",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R15",
+      "data_kind": "approved_synthetic",
+      "question": "Ransomware on eval-a-web-01",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "72bc445f-38af-5a62-8f70-00ca78d0f18e",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "RANSOMWARE",
+          "message": "Encryption activity alert",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "a0b06161-5c56-5a5c-ae13-0f372b9274ad",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "ransomware",
+      "risk_level": "HIGH",
+      "evidence_ids": [
+        "72bc445f-38af-5a62-8f70-00ca78d0f18e"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R16",
+    "tenant": "Company B (Demo)",
+    "category": "malware",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R16",
+      "data_kind": "approved_synthetic",
+      "question": "Ransomware after login on eval-b-web-01",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "fadc8ff7-65af-51cd-a6f0-34ce4639c2cd",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "RANSOMWARE",
+          "message": "Encryption activity alert",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "ace9ca50-5a76-5623-9604-cc9ad1921437",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "ransomware",
+      "risk_level": "HIGH",
+      "evidence_ids": [
+        "fadc8ff7-65af-51cd-a6f0-34ce4639c2cd"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R17",
+    "tenant": "Company A (Demo)",
+    "category": "malware",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R17",
+      "data_kind": "approved_synthetic",
+      "question": "มัลแวร์ eval-a-web-01",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "f5749f26-10f3-57f9-a0af-0ef17f8adfd5",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "MALWARE",
+          "message": "Suspicious executable alert",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "47d20e39-cc05-5701-b801-47d3c85bc8f7",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "malware",
+      "risk_level": "MEDIUM",
+      "evidence_ids": [
+        "f5749f26-10f3-57f9-a0af-0ef17f8adfd5"
+      ],
+      "rationale": "The target alert supports the reported issue at the specified asset/time/account; compromise remains unconfirmed."
+    }
+  },
+  {
+    "case_id": "R18",
+    "tenant": "Company B (Demo)",
+    "category": "malware",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R18",
+      "data_kind": "approved_synthetic",
+      "question": "Malware on missing-host-99",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "880404dd-ab78-5466-b171-10e898bde6a0",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "MALWARE",
+          "message": "Suspicious executable alert",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "5c669d70-2162-520f-8afe-d712210e6a58",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "malware",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R19",
+    "tenant": "Company A (Demo)",
+    "category": "benign",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R19",
+      "data_kind": "approved_synthetic",
+      "question": "Scheduled maintenance completed on eval-a-web-01",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "af98de8a-e7c3-5541-996c-6bf152a560df",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "MAINTENANCE",
+          "message": "Approved maintenance completed",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "78cb8e1e-c452-55b8-b749-377b732dcf64",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "unknown_security_issue",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R20",
+    "tenant": "Company B (Demo)",
+    "category": "benign",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R20",
+      "data_kind": "approved_synthetic",
+      "question": "Routine health check on eval-b-web-01",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "bbd052f5-5a27-5656-b298-09fd1790e727",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Service healthy",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "1a96d06b-afee-5abe-997b-56e6ff553e45",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "unknown_security_issue",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R21",
+    "tenant": "Company A (Demo)",
+    "category": "benign",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R21",
+      "data_kind": "approved_synthetic",
+      "question": "Normal backup completed on eval-a-web-01",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "35a4e1a9-ac75-5ee1-8928-78a467cbd867",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "BACKUP_SUCCESS",
+          "message": "Scheduled backup completed",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "575a9c38-4c69-5b06-970e-d24647f7d05f",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "unknown_security_issue",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R22",
+    "tenant": "Company B (Demo)",
+    "category": "benign",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R22",
+      "data_kind": "approved_synthetic",
+      "question": "Is this known authorized port scan on eval-b-web-01 malicious?",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "aa305c44-6f71-5c7f-b189-19fd60b5144a",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "PORT_SCAN",
+          "message": "Approved vulnerability scanner; scheduled authorized scan",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "2eacb3d0-1a9a-5934-a4b3-9c07dad4bf2b",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "port_scan",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R23",
+    "tenant": "Company A (Demo)",
+    "category": "benign",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R23",
+      "data_kind": "approved_synthetic",
+      "question": "User confirmed a mistyped password during login on eval-a-web-01",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "54e77c73-0975-50a5-8353-05c927af7cfa",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "FAILED_LOGIN",
+          "message": "User-confirmed typo; successful expected login followed",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "313aab8a-f77a-567d-8c2c-b87508f7315f",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "suspicious_login",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R24",
+    "tenant": "Company B (Demo)",
+    "category": "benign",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R24",
+      "data_kind": "approved_synthetic",
+      "question": "Resolved false-positive malware alert on eval-b-web-01",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "38159858-59ae-5990-bb6d-443c58139cf1",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "MALWARE",
+          "message": "SOC adjudicated false positive; clean software",
+          "occurred_at": "2026-11-04T03:00:00"
+        },
+        {
+          "id": "41e8b587-d9bf-53a3-8720-56d911ffb6d3",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "malware",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R25",
+    "tenant": "Company A (Demo)",
+    "category": "uncertain",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R25",
+      "data_kind": "approved_synthetic",
+      "question": "Suspicious login on eval-a-web-01",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "32464fd1-45a4-5fed-837f-18b4b5f013cc",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "suspicious_login",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R26",
+    "tenant": "Company B (Demo)",
+    "category": "uncertain",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R26",
+      "data_kind": "approved_synthetic",
+      "question": "Port scan on eval-b-web-01",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "2e11088b-ec49-5f3d-bcbb-22c7794d40c6",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "port_scan",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R27",
+    "tenant": "Company A (Demo)",
+    "category": "uncertain",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R27",
+      "data_kind": "approved_synthetic",
+      "question": "Malware on eval-a-web-01",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "5d241234-9156-5f7e-8fc9-9a82ce23a7ef",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "malware",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R28",
+    "tenant": "Company B (Demo)",
+    "category": "uncertain",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R28",
+      "data_kind": "approved_synthetic",
+      "question": "Phishing reported on eval-b-web-01",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "b9d7a40d-b9be-58de-950a-622fca09d487",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "phishing",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R29",
+    "tenant": "Company A (Demo)",
+    "category": "uncertain",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R29",
+      "data_kind": "approved_synthetic",
+      "question": "Unknown IP 203.0.113.250",
+      "assets": [
+        {
+          "id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "hostname": "eval-a-web-01",
+          "ip_address": "192.0.2.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "name": "EVAL-LC-A",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "dced4a78-ac6d-5f81-b28a-47dce8483e5d",
+          "asset_id": "ec313a29-9f74-5b22-be15-6eded94b8642",
+          "collector_id": "48eed1d9-561f-5d64-bf01-0d396ed9f8f9",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "unknown_security_issue",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  },
+  {
+    "case_id": "R30",
+    "tenant": "Company B (Demo)",
+    "category": "uncertain",
+    "package": {
+      "version": "research-30-v1",
+      "case_id": "R30",
+      "data_kind": "approved_synthetic",
+      "question": "Something strange happened on eval-b-web-01",
+      "assets": [
+        {
+          "id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "hostname": "eval-b-web-01",
+          "ip_address": "198.51.100.110",
+          "asset_type": "WEB_SERVER"
+        }
+      ],
+      "collectors": [
+        {
+          "id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "name": "EVAL-LC-B",
+          "site": "Synthetic lab"
+        }
+      ],
+      "logs": [
+        {
+          "id": "9503a214-88a0-51eb-8cd0-e877e9c6732b",
+          "asset_id": "a0f0ea71-b9e3-5088-b382-705d995fd60a",
+          "collector_id": "3e33a9be-e0e4-582d-b6c9-76bf20242f9e",
+          "event_type": "HEALTH_CHECK",
+          "message": "Routine service heartbeat",
+          "occurred_at": "2026-11-04T03:01:00"
+        }
+      ],
+      "public_knowledge": []
+    },
+    "ground_truth": {
+      "incident_type": "unknown_security_issue",
+      "risk_level": "UNKNOWN",
+      "evidence_ids": [],
+      "rationale": "No unresolved supporting incident evidence: benign/adjudicated activity, absent alert, or mismatch in asset/time/account. UNKNOWN does not mean safe."
+    }
+  }
+]
