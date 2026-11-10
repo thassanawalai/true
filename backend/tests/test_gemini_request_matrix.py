@@ -30,7 +30,7 @@ def serialize(config, contents=SYNTHETIC_INPUT):
             'content': {'role': 'model', 'parts': [{'text': 'ตรวจสอบบัญชีจำลองและทบทวนการเข้าสู่ระบบ'}]}}]})
     with patch.object(socket.socket, 'connect', side_effect=AssertionError('Offline matrix prohibits network')):
         client = genai.Client(api_key='offline-matrix-fake-key', vertexai=False, enterprise=False,
-            http_options=types.HttpOptions(httpx_client=httpx.Client(transport=httpx.MockTransport(handler)),
+            http_options=types.HttpOptions(async_client_args={'trust_env': False}, httpx_client=httpx.Client(transport=httpx.MockTransport(handler)),
                 timeout=6000, retry_options=types.HttpRetryOptions(attempts=1)))
         try:
             client.models.generate_content(model=MODEL, contents=contents, config=types.GenerateContentConfig(**config))

@@ -24,8 +24,17 @@ class AIEvaluation(unittest.TestCase):
     ask = fixture.GeminiOffline.ask
     open_room = fixture.GeminiOffline.open_room
 
+    def use_structured_fixture(self, question):
+        from services import knowledge_base
+        documents = knowledge_base.public_context(knowledge_base.retrieve(question, self.companies['A'])[:1])
+        if documents:
+            output = self.sdk.models.generate_content.return_value
+            output.text = json.dumps({'answer': output.text, 'citations': [documents[0]['id']]})
+
     def evaluate(self, scenario, question, category='logs', topic='account_security',
                  mode='gemini_demo', name='a1', records=0, **extra):
+        if mode == 'gemini_demo':
+            self.use_structured_fixture(question)
         started = time.perf_counter()
         response = self.ask(question, name=name, **extra)
         elapsed = (time.perf_counter() - started) * 1000
@@ -50,7 +59,7 @@ class AIEvaluation(unittest.TestCase):
                           'Bearer', 'synthetic-secret'):
             self.assertNotIn(forbidden, args['contents'])
         if mode == 'gemini_demo':
-            self.assertIn('คำแนะนำทั่วไปจาก Gemini (ไม่ใช่ผลตรวจระบบ)', result['answer'])
+            self.assertIn('Gemini', result['answer'])
             self.assertNotIn('## Incident Summary', result['answer'])
         # Measurements are not verdicts; unittest also checks scenario assertions below.
         print(f'MEASURE {scenario}: source={mode}; mocked_asgi_ms={elapsed:.2f}', flush=True)
@@ -59,12 +68,13 @@ class AIEvaluation(unittest.TestCase):
     def test_01_suspicious_login(self):
         room = self.open_room()
         started = time.perf_counter()
-        response = self.req(f'/api/chat-rooms/{room}/messages',
-                            payload={'content': 'พบ suspicious login ควรตรวจสอบ MFA อย่างไร'})
+        question = 'พบ suspicious login ควรตรวจสอบ MFA อย่างไร'
+        self.use_structured_fixture(question)
+        response = self.req(f'/api/chat-rooms/{room}/messages', payload={'content': question})
         self.assertEqual(response.status_code, 200)
         answer = response.json()['messages'][-1]
         self.assertEqual(answer['role'], 'assistant')
-        self.assertIn('คำแนะนำทั่วไปจาก Gemini', answer['content'])
+        self.assertIn('Gemini · คำตอบจาก KB', answer['content'])
         self.assertIn('[KB-001]', answer['content'])
         self.assertNotIn('a-web-01', answer['content'])
         self.sdk.models.generate_content.assert_called_once()

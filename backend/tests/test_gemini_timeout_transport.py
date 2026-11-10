@@ -44,7 +44,7 @@ class GeminiTimeoutTransport(unittest.TestCase):
             for headers in (None, {'X-Server-Timeout': '12'}):
                 client = genai.Client(api_key='offline-fake-key', vertexai=False, enterprise=False,
                     http_options=types.HttpOptions(timeout=15001, headers=headers,
-                        retry_options=types.HttpRetryOptions(attempts=1), client_args={'trust_env': False}))
+                        retry_options=types.HttpRetryOptions(attempts=1), client_args={'trust_env': False}, async_client_args={'trust_env': False}))
                 try:
                     client.models.generate_content(model='offline-model', contents='synthetic',
                         config=types.GenerateContentConfig(automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)))

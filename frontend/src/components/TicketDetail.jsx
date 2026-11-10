@@ -60,6 +60,17 @@ export default function TicketDetail({ ticketId, user, onClose, onChanged }) {
         <div className="ticket-status-row"><span className={'ticket-status status-' + ticket.status}>{ticket.status.replaceAll('_', ' ')}</span><span>เวลาตามเขตเวลาของ Browser</span></div>
         <dl className="ticket-metadata">{metadata.map(([name, value]) => <div key={name}><dt>{name}</dt><dd>{value || 'ไม่ระบุ'}</dd></div>)}</dl>
         <section><h3>Description</h3><p className="ticket-description">{ticket.description || 'ไม่มีรายละเอียดเพิ่มเติม'}</p></section>
+        <section aria-label="AI Assessment"><h3>AI Assessment</h3>
+          {ticket.assessment ? <dl className="ticket-metadata">
+            <div><dt>แหล่งประเมิน</dt><dd>{ticket.assessment.source === 'gemini'
+              ? `Gemini (${ticket.assessment.model})`
+              : ticket.assessment.source === 'fallback' ? 'Fallback · รอ SOC ตรวจทาน' : 'Manual override'}</dd></div>
+            <div><dt>ประเภทเหตุการณ์</dt><dd>{ticket.assessment.incident_type}</dd></div>
+            <div><dt>เหตุผล</dt><dd>{ticket.assessment.reason}</dd></div>
+            <div><dt>คำแนะนำ</dt><dd>{ticket.assessment.recommendation}</dd></div>
+            <div><dt>Priority Policy</dt><dd>{ticket.assessment.priority_policy}</dd></div>
+          </dl> : <p>ยังไม่มีผลประเมินที่บันทึกไว้</p>}
+        </section>
         {internal && <section className="ticket-actions" aria-label="Support actions">
           <label>Update Ticket Status<select aria-label="Update Ticket Status" value={ticket.status} disabled={saving} onChange={e => change(() => updateTicketStatus(ticketId, e.target.value))}>
             {['NEW', 'IN_PROGRESS', 'PENDING', 'RESOLVED'].map(status => <option key={status} value={status}>{status.replaceAll('_', ' ')}</option>)}

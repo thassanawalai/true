@@ -81,12 +81,20 @@ class PublicDemoLogin(unittest.TestCase):
                 self.assertNotIn('token', users.text)
 
     def test_mock_login_preserves_roles_and_session_headers(self):
-        from routers.demo_auth import LoginRequest, login
+        invalid = self.client.post('/api/demo-auth/login', json={'user_id': 'not-a-uuid'})
+        self.assertEqual(invalid.status_code, 422)
         for name, role in [('a1', 'CUSTOMER'), ('support', 'SUPPORT'), ('admin', 'ADMIN')]:
-            # SQLite's native UUID binder requires UUID objects; PostgreSQL accepts
-            # the endpoint's string IDs. Exercise login with the fixture's UUID.
-            with self.Session() as db:
-                response = login(LoginRequest.model_construct(user_id=self.users[name]), db)
+            with patch.dict(os.environ, {'GEMINI_ENABLED': 'false', 'DEMO_AUTH_MODE': 'mock'}):
+                login = self.client.post('/api/demo-auth/login', json={'user_id': str(self.users[name])})
+                self.assertEqual(login.status_code, 200, login.text)
+                response = login.json()
+                me = self.client.get('/api/demo-auth/me', headers={'X-Demo-Authorization': 'Bearer ' + response['token']})
+                self.assertEqual(me.status_code, 200)
+            login = self.client.post('/api/demo-auth/login', json={
+                'user_id': str(self.users[name]), 'password': 'mock-password-fixture-' + name,
+            })
+            self.assertEqual(login.status_code, 200, login.text)
+            response = login.json()
             self.assertEqual(response['user']['role'], role)
             for header in ('Authorization', 'X-Demo-Authorization'):
                 me = self.client.get('/api/demo-auth/me',
@@ -169,8 +177,9 @@ class DeploymentConfiguration(unittest.TestCase):
                 with Operations.context(context):
                     modules[0].upgrade()
                     connection.exec_driver_sql("INSERT INTO companies (id, name) VALUES ('00000000000000000000000000000001', 'Preserved synthetic company')")
-                    modules[1].upgrade()
-                self.assertEqual(len(inspect(connection).get_table_names()), 13)
+                    for migration in modules[1:]:
+                        migration.upgrade()
+                self.assertEqual(len(inspect(connection).get_table_names()), 14)
                 self.assertEqual(connection.exec_driver_sql('SELECT name FROM companies').scalar(), 'Preserved synthetic company')
                 self.assertEqual(compare_metadata(context, Base.metadata), [])
         finally: engine.dispose()
@@ -185,6 +194,6 @@ class DeploymentConfiguration(unittest.TestCase):
         with patch('core.database.SQLALCHEMY_DATABASE_URL', 'postgresql://example.invalid/demo'):
             command.upgrade(config, '0ca6d68be46d:head', sql=True)
         sql = output.getvalue().upper()
-        self.assertEqual(sql.count('CREATE TABLE '), 5)
+        self.assertEqual(sql.count('CREATE TABLE '), 6)
         self.assertNotIn('DROP TABLE', sql)
         self.assertNotIn('DELETE FROM', sql)

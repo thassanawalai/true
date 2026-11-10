@@ -1,58 +1,26 @@
 import uuid
 from datetime import datetime
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models.models import (
     Company,
     ImpactEnum,
-    PriorityEnum,
-    RoleEnum,
     SLAPolicy,
     Ticket,
+    TicketAssessment,
     TicketCategory,
     UrgencyEnum,
     User,
 )
+from services.incident_assessment import assess, priority_for
 
 
-DEMO_COMPANY = "True Digital Group (Demo)"
-
-
-def _get_demo_records(db: Session):
-    company = db.query(Company).filter(Company.name == DEMO_COMPANY).first()
-    if company is None:
-        company = Company(name=DEMO_COMPANY)
-        db.add(company)
-        db.flush()
-
-    requester = db.query(User).filter(User.email == "demo.customer@example.test").first()
-    if requester is None:
-        requester = User(
-            email="demo.customer@example.test",
-            full_name="Demo Customer",
-            role=RoleEnum.CUSTOMER,
-            company_id=company.id,
-        )
-        db.add(requester)
-
-    support = db.query(User).filter(User.email == "soc.analyst@example.test").first()
-    if support is None:
-        support = User(
-            email="soc.analyst@example.test",
-            full_name="Demo SOC Analyst",
-            role=RoleEnum.SUPPORT,
-            company_id=company.id,
-        )
-        db.add(support)
-
-    category = db.query(TicketCategory).filter(TicketCategory.name == "Security Incident").first()
-    if category is None:
-        category = TicketCategory(name="Security Incident")
-        db.add(category)
-
-    db.flush()
-    return company, requester, category
+def assess_ticket(subject, description, requester, company_name):
+    description = description.strip() or "Security incident reported via AI assistant."
+    subject = subject or description.splitlines()[0][:120] or "Security incident"
+    return assess(subject, description, requester, company_name)
 
 
 def create_ticket_from_ai(
@@ -64,6 +32,7 @@ def create_ticket_from_ai(
     company_id=None,
     requester_id=None,
     commit=True,
+    assessed=None,
 ) -> dict:
     """Create a demo incident with the required foreign keys and SLA policy."""
     try:
@@ -73,25 +42,19 @@ def create_ticket_from_ai(
         requester = db.query(User).filter(User.id == requester_id, User.company_id == company_id).first()
         if not company or not requester:
             return {"success": False, "error": "Invalid requester/company"}
+        description = issue_description.strip() or "Security incident reported via AI assistant."
+        analysis, metadata = assessed or assess_ticket(subject, description, requester, company.name)
+        impact = impact or analysis.impact
+        urgency = urgency or analysis.urgency
+        priority = priority_for(impact, urgency)
+        if impact != analysis.impact or urgency != analysis.urgency:
+            metadata = {**metadata, 'source': 'manual_override'}
+
         category = db.query(TicketCategory).filter(TicketCategory.name == "Security Incident").first()
         if not category:
             category = TicketCategory(name="Security Incident")
             db.add(category)
             db.flush()
-        description = issue_description.strip() or "Security incident reported via AI assistant."
-        upper = description.upper()
-        critical_terms = ("RANSOMWARE", "MALWARE", "BREACH", "EXFILTRATION", "EDR", "CRITICAL")
-        high = any(term in upper for term in critical_terms)
-        impact = impact or (ImpactEnum.SIGNIFICANT if high else ImpactEnum.MODERATE)
-        urgency = urgency or (UrgencyEnum.HIGH if high else UrgencyEnum.MEDIUM)
-        if impact == ImpactEnum.EXTENSIVE or urgency == UrgencyEnum.CRITICAL:
-            priority = PriorityEnum.P1
-        elif impact == ImpactEnum.SIGNIFICANT or urgency == UrgencyEnum.HIGH:
-            priority = PriorityEnum.P2
-        elif impact == ImpactEnum.MODERATE or urgency == UrgencyEnum.MEDIUM:
-            priority = PriorityEnum.P3
-        else:
-            priority = PriorityEnum.P4
 
         sla = db.query(SLAPolicy).filter(SLAPolicy.priority == priority).first()
         if sla is None:
@@ -101,8 +64,12 @@ def create_ticket_from_ai(
                 time_to_own_minutes=60,
                 time_to_resolve_minutes=240,
             )
-            db.add(sla)
-            db.flush()
+            try:
+                with db.begin_nested():
+                    db.add(sla)
+                    db.flush()
+            except IntegrityError:
+                sla = db.query(SLAPolicy).filter(SLAPolicy.priority == priority).one()
 
         subject = subject or description.splitlines()[0][:120] or "Security incident"
         ticket = Ticket(
@@ -119,6 +86,12 @@ def create_ticket_from_ai(
             status="NEW",
             created_at=datetime.utcnow(),
         )
+        ticket.assessment = TicketAssessment(
+            incident_type=analysis.incident_type,
+            reason=analysis.reason,
+            recommendation=analysis.recommendation,
+            **metadata,
+        )
         db.add(ticket)
         db.flush()
         if commit:
@@ -130,6 +103,6 @@ def create_ticket_from_ai(
             "ticket_number": ticket.ticket_number,
             "priority": ticket.priority.value,
         }
-    except Exception as exc:
+    except Exception:
         db.rollback()
-        return {"success": False, "error": str(exc)}
+        return {"success": False, "error": "Unable to create ticket"}

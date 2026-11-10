@@ -12,6 +12,7 @@ export function RoomConversation({ roomId, user, onLinked }) {
   const [busy, setBusy] = useState(false);
   const [input, setInput] = useState('');
   const [subject, setSubject] = useState('');
+  const [description, setDescription] = useState('');
   const [confirming, setConfirming] = useState(false);
   const pending = useRef(false);
   const messageList = useRef(null);
@@ -118,11 +119,13 @@ export function RoomConversation({ roomId, user, onLinked }) {
         <p>Enter เพื่อส่ง · Shift + Enter เพื่อขึ้นบรรทัดใหม่</p>
       </form>
       {confirming && <dialog ref={ticketDialog} className="soc-ticket-confirm" aria-labelledby="soc-ticket-title" onCancel={() => setConfirming(false)}>
-        <form onSubmit={event => { event.preventDefault(); if (subject.trim()) mutate('/ticket', { subject: subject.trim() }); }}>
+        <form onSubmit={event => { event.preventDefault(); if (subject.trim()) mutate('/ticket', { subject: subject.trim(), ...(description.trim() ? { description: description.trim() } : {}) }); }}>
           <header><h3 id="soc-ticket-title">สร้างรายการแจ้งปัญหา</h3><button type="button" aria-label="ปิด" disabled={busy} onClick={() => setConfirming(false)}><X size={19}/></button></header>
-          <p>หัวข้อจะปรากฏให้คนในบริษัทเห็น ประวัติแชทจะบันทึกไว้ให้คุณและทีม SOC เท่านั้น</p>
+          <p>หัวข้อและรายละเอียดจะปรากฏให้คนในบริษัทเห็น ประวัติแชทจะบันทึกไว้ให้คุณและทีม SOC เท่านั้น</p>
           {error && <p role="alert" className="soc-chat-error">{error}</p>}
           <label>หัวข้อปัญหา<input autoFocus aria-label="หัวข้อปัญหา" required maxLength={200} value={subject} onChange={event => setSubject(event.target.value)} placeholder="สรุปปัญหาที่ต้องการให้ตรวจสอบ"/></label>
+          <label>รายละเอียดเหตุการณ์ (ไม่บังคับ)<textarea maxLength={5000} value={description}
+            onChange={event => setDescription(event.target.value)} placeholder="รายละเอียดสำหรับประเมินเหตุการณ์"/></label>
           <footer><button type="button" disabled={busy} onClick={() => setConfirming(false)}>ยกเลิก</button><button className="soc-primary" disabled={busy || !subject.trim()}>ยืนยันสร้างรายการ</button></footer>
         </form>
       </dialog>}

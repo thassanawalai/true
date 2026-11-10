@@ -114,6 +114,8 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [selected, setSelected] = useState('');
+  const [password, setPassword] = useState('');
+  const passwordRequired = users.some(user => user.id === selected && user.password_required);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -137,11 +139,11 @@ export default function App() {
     return () => controller.abort();
   }, [retry]);
   const login = async () => {
-    if (busy || !selected) return;
+    if (busy || !selected || (passwordRequired && !password)) return;
     setBusy(true); setError('');
     try {
-      const result = await api('/demo-auth/login', { method: 'POST', body: JSON.stringify({ user_id: selected }) });
-      sessionStorage.setItem('demo_token', result.token); setUser(result.user);
+      const result = await api('/demo-auth/login', { method: 'POST', body: JSON.stringify({ user_id: selected, ...(passwordRequired ? { password } : {}) }) });
+      sessionStorage.setItem('demo_token', result.token); setPassword(''); setUser(result.user);
     } catch (error) { setError(error.message); }
     finally { setBusy(false); }
   };
@@ -152,11 +154,15 @@ export default function App() {
       <h1 className="text-2xl font-bold">SOC AI Support — Demo Login</h1>
       <p className="text-slate-400 text-sm">Demo identities only. Not production authentication.</p>
       {loading && <p role="status">Loading demo session…</p>}
-      <select aria-label="Select demo user" disabled={loading || busy} className="w-full bg-slate-800 p-3 rounded" value={selected} onChange={event => setSelected(event.target.value)}>
+      <select aria-label="Select demo user" disabled={loading || busy} className="w-full bg-slate-800 p-3 rounded" value={selected} onChange={event => { setSelected(event.target.value); setPassword(''); }}>
         <option value="">Select demo user</option>
         {users.map(user => <option key={user.id} value={user.id}>{user.name} — {user.company} ({user.role})</option>)}
       </select>
-      <button disabled={!selected || busy || loading} onClick={login} className="w-full rounded bg-blue-600 p-3 disabled:opacity-50">{busy ? 'Logging in…' : 'Login'}</button>
+      {passwordRequired && <input aria-label="Demo password" type="password" autoComplete="current-password"
+        className="w-full bg-slate-800 p-3 rounded" value={password} maxLength={256} disabled={busy}
+        onChange={event => setPassword(event.target.value)}
+        onKeyDown={event => { if (event.key === 'Enter') login(); }} />}
+      <button disabled={!selected || busy || loading || (passwordRequired && !password)} onClick={login} className="w-full rounded bg-blue-600 p-3 disabled:opacity-50">{busy ? 'Logging in…' : 'Login'}</button>
       {error && <p role="alert" className="text-red-400">{error}</p>}
       {!loading && !users.length && !error && <p>No demo users available.</p>}
       {!loading && <button onClick={() => { setLoading(true); setError(''); setRetry(value => value + 1); }}>Reload demo users</button>}

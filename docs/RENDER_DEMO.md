@@ -4,6 +4,34 @@ One Docker web service serves React and FastAPI on the same HTTPS origin. No
 Cloud Shell process is needed after deployment. No deployment or Neon changes
 are performed by this preparation. Do not add a Render database.
 
+## Gemini and login repair
+
+For the Gemini build, use branch `feature/render-gemini-login`. The runtime
+continues to serve FastAPI and the React bundle together and validates the DB
+schema on startup. On the confirmed demo Neon database, inspect the current
+revision before deploying. If the current revision is `20261109_demo`, the
+reviewed upgrade to `20261110_ticket_assessment` adds only the ticket assessment
+table. Run the upgrade separately after approval. Existing tickets remain readable.
+
+The API validates login IDs as UUIDs and returns HTTP 422 for malformed IDs.
+After deploying and confirming mock login, configure the following in the
+Render service environment for Gemini:
+
+| Variable | Value |
+|---|---|
+| GEMINI_ENABLED | true |
+| GEMINI_API_KEY | Google AI Studio server-side key |
+| GEMINI_MODEL | Model ID available to the key with structured generation |
+| DEMO_AUTH_MODE | password |
+| DEMO_LOGIN_PASSWORDS_JSON | JSON object keyed by seeded demo email, with a distinct random password of 16–256 characters for each enabled identity |
+
+Enabling Gemini requires password sign-in for demo users. Use synthetic
+incident descriptions and questions. Gemini receives only reviewed public KB
+excerpts. Company-only documents remain local. New tickets show Gemini or
+Fallback as the assessment source.
+
+The remaining sections describe the existing Render baseline and mock rehearsal.
+
 ## Access and persistence
 
 Visitors reach the existing SOC AI Support Demo Login page directly, without an

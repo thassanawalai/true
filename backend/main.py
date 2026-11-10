@@ -1,10 +1,12 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, Depends
-from fastapi.responses import FileResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from typing import Literal
 from uuid import UUID
@@ -57,6 +59,18 @@ app.include_router(customer_data.router)
 app.include_router(customer_chat.router)
 app.include_router(chat_rooms.router)
 # Vite proxies /api locally; explicit cross-origin access is disabled by default.
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(_request, exc):
+    return JSONResponse(status_code=422, content={'detail': [
+        {'loc': error['loc'], 'msg': error['msg'], 'type': error['type']} for error in exc.errors()
+    ]})
+
+
+@app.exception_handler(OperationalError)
+async def database_unavailable(_request, _exc):
+    return JSONResponse(status_code=503, content={'detail': 'Database is temporarily unavailable'})
+
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]

@@ -5,6 +5,10 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from threading import BoundedSemaphore
 
+from pydantic import ValidationError
+
+from core.rate_limits import FixedWindow, positive_setting
+
 HTTP_TIMEOUT_MS = 15000
 SERVER_DEADLINE_SECONDS = 12
 DEADLINE_SECONDS = 16
@@ -14,6 +18,8 @@ MAX_CONTEXT_CHARS = 6000
 MAX_HISTORY = 6
 _pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix='soc-gemini')
 _slots = BoundedSemaphore(2)
+_minute = FixedWindow(60)
+_day = FixedWindow(86400)
 
 SYSTEM = """คุณเป็นผู้ช่วย SOC ให้คำแนะนำทั่วไปภาษาไทยแบบข้อความธรรมดาไม่เกิน 3 ข้อและคำถามต่อ 1 ข้อ
 ใช้เฉพาะ telemetry จำลองและ public_knowledge ที่ให้มา อย่าแต่งหลักฐานหรืออ้างว่าตรวจระบบจริง
@@ -36,17 +42,36 @@ def validate_text(text):
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     if len(lines) > 6 or any(len(line) > 600 for line in lines):
         return None
+    return text if safe_input(text) else None
+
+
+def safe_input(text):
+    """Keep configured credentials and common pasted secrets out of prompts and responses."""
     for name in ('GEMINI_API_KEY', 'DEMO_SESSION_SECRET', 'DATABASE_URL'):
-        secret = os.getenv(name)
-        if secret and secret in text:
-            return None
-    return text
+        value = os.getenv(name)
+        if value and value in text:
+            return False
+    try:
+        passwords = json.loads(os.getenv('DEMO_LOGIN_PASSWORDS_JSON', '{}'))
+    except ValueError:
+        passwords = {}
+    if isinstance(passwords, dict) and any(isinstance(value, str) and value and value in text
+                                           for value in passwords.values()):
+        return False
+    return not re.search(
+        r'-----BEGIN [^-]+PRIVATE KEY-----|\bAIza[\w-]{35}\b|\bBearer\s+\S+|'
+        r'\b(?:password|api[_ -]?key|token|secret)\s*[:=]\s*\S+',
+        text, re.IGNORECASE,
+    )
 
 
 def configured():
+    model = os.getenv('GEMINI_MODEL', '')
+    key = os.getenv('GEMINI_API_KEY', '').strip()
     return (os.getenv('GEMINI_ENABLED', '').lower() == 'true'
-            and bool(os.getenv('GEMINI_API_KEY', '').strip())
-            and bool(re.fullmatch(r'(?:models/)?[A-Za-z0-9][A-Za-z0-9._-]{0,120}', os.getenv('GEMINI_MODEL', ''))))
+            and bool(key) and key != 'replace_with_your_gemini_api_key'
+            and bool(re.fullmatch(r'(?:models/)?[A-Za-z0-9][A-Za-z0-9._-]{0,120}', model))
+            and safe_input(model))
 
 
 def new_client():
@@ -62,46 +87,71 @@ def new_client():
             client_args={'trust_env': False}, async_client_args={'trust_env': False}))
 
 
-def _generate(payload):
+def _generate(payload, system=SYSTEM, schema=None):
     from google.genai import types
+    options = {}
+    if schema is not None:
+        options.update(response_mime_type='application/json', response_json_schema=schema.model_json_schema())
     client = new_client()
     try:
         response = client.models.generate_content(model=os.environ['GEMINI_MODEL'], contents=payload,
-            config=types.GenerateContentConfig(system_instruction=SYSTEM,
+            config=types.GenerateContentConfig(system_instruction=system,
                 # Gemini 3.x: omit unsupported candidate count and deprecated sampling overrides.
                 max_output_tokens=MAX_OUTPUT_TOKENS,
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)))
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True), **options))
         # Keep safety refusals and truncated/ambiguous responses on fallback.
         if len(response.candidates or []) != 1 or str(response.candidates[0].finish_reason).split('.')[-1] != 'STOP':
             return None
         parts = getattr(getattr(response.candidates[0], 'content', None), 'parts', None) or []
         if any(getattr(part, 'function_call', None) for part in parts):
             return None
-        return validate_text(response.text)
+        output = response.text
+        if schema is None:
+            return validate_text(output)
+        if not isinstance(output, str) or len(output) > MAX_OUTPUT_CHARS or not safe_input(output):
+            return None
+        try:
+            parsed = schema.model_validate_json(output)
+        except ValidationError:
+            return None
+        return parsed if safe_input(str(parsed.model_dump())) else None
     finally:
         client.close()
 
 
-def guidance(context):
+def guidance(context, user_id=None):
+    return request(context, user_id=user_id)[0]
+
+
+def request(context, *, user_id, system=SYSTEM, schema=None):
     if not configured():
-        return None
+        return None, 'provider_disabled'
     payload = json.dumps(context, ensure_ascii=False, separators=(',', ':'))
-    if len(payload) > MAX_CONTEXT_CHARS or not _slots.acquire(blocking=False):
-        return None
+    if len(payload) > MAX_CONTEXT_CHARS or not safe_input(payload):
+        return None, 'input_guard'
+    if not _slots.acquire(blocking=False):
+        return None, 'provider_busy'
+    if not _minute.take(
+        ('global', positive_setting('GEMINI_GLOBAL_PER_MINUTE', 60)),
+        (('user', user_id), positive_setting('GEMINI_USER_PER_MINUTE', 12)),
+    ) or not _day.take(('global', positive_setting('GEMINI_MAX_CALLS_PER_DAY', 250))):
+        _slots.release()
+        return None, 'usage_limit'
     try:
-        future = _pool.submit(_generate, payload)
+        future = _pool.submit(_generate, payload, system, schema)
     except Exception:
         _slots.release()
-        return None
+        return None, 'provider_unavailable'
     # Release only when the worker really finishes. A timed-out request cannot
     # start unbounded new workers or leave an unbounded submission queue behind.
     future.add_done_callback(lambda _future: _slots.release())
     try:
-        return future.result(timeout=DEADLINE_SECONDS)
+        answer = future.result(timeout=DEADLINE_SECONDS)
+        return (answer, None) if answer is not None else (None, 'invalid_response')
     except Exception:
         # Includes invalid key (400/401/403), unavailable model, quota (429),
         # transport timeouts, missing SDK, blocked/malformed output. No retries.
-        return None
+        return None, 'provider_unavailable'
 
 
 # Separate structured research path. Legacy guidance behavior remains unchanged.

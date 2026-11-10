@@ -9,6 +9,7 @@ MAX_MESSAGES = 200
 lock = RLock()
 rooms = {}
 answering = set()
+promoting = set()
 
 
 def purge():
