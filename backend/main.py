@@ -27,7 +27,20 @@ async def lifespan(app: FastAPI):
             raise RuntimeError('Set DEMO_SESSION_SECRET (at least 32 characters).')
         if not (STATIC_DIR / 'index.html').is_file():
             raise RuntimeError('Frontend build is missing from the deployment image.')
-        # Validate only. Migrations are a separate, explicitly authorized operation.
+        if os.getenv('RUN_TICKET_ASSESSMENT_MIGRATION') == 'true':
+            from alembic import command
+            from alembic.config import Config
+            from alembic.migration import MigrationContext
+
+            with engine.connect() as connection:
+                revision = MigrationContext.configure(connection).get_current_heads()
+            target = '20261110_ticket_assessment'
+            if revision == ('20261109_demo',):
+                config = Config(str(Path(__file__).resolve().parent / 'alembic.ini'))
+                command.upgrade(config, target)
+                print(f'Demo migration applied: {target}', flush=True)
+            elif revision != (target,):
+                raise RuntimeError('Unexpected demo database Alembic revision. Migration skipped.')
         missing = set(Base.metadata.tables) - set(inspect(engine).get_table_names())
         if missing:
             raise RuntimeError('Database schema is incomplete; run the reviewed Alembic upgrade before deploying.')
