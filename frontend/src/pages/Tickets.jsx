@@ -146,6 +146,7 @@ const Tickets = ({ user, companyId }) => {
                                 <input
                                     type="text"
                                     required
+                                    maxLength={200}
                                     value={formData.subject}
                                     onChange={(e) => setFormData({...formData, subject: e.target.value})}
                                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
@@ -156,6 +157,7 @@ const Tickets = ({ user, companyId }) => {
                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Description</label>
                                 <textarea
                                     required
+                                    maxLength={5000}
                                     value={formData.description}
                                     onChange={(e) => setFormData({...formData, description: e.target.value})}
                                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none min-h-[100px]"
@@ -210,6 +212,23 @@ const Tickets = ({ user, companyId }) => {
                             <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 text-sm text-slate-700 whitespace-pre-wrap">
                                 {selectedTicket.description || "No additional description provided."}
                             </div>
+
+                            <section className="p-4 bg-slate-50 rounded-lg border border-slate-100 text-sm space-y-2" aria-label="AI Assessment">
+                                <h5 className="font-semibold text-slate-900">AI Assessment</h5>
+                                {selectedTicket.assessment ? (
+                                    <>
+                                        <p><strong>Source:</strong> {{
+                                            gemini: 'Gemini', fallback: 'Fallback — SOC review required', manual_override: 'Manual override',
+                                        }[selectedTicket.assessment.source] || selectedTicket.assessment.source}
+                                            {selectedTicket.assessment.model && ` (${selectedTicket.assessment.model})`}
+                                        </p>
+                                        <p><strong>Incident type:</strong> {selectedTicket.assessment.incident_type}</p>
+                                        <p><strong>Reason:</strong> {selectedTicket.assessment.reason}</p>
+                                        <p><strong>Recommendation:</strong> {selectedTicket.assessment.recommendation}</p>
+                                        <p><strong>Priority policy:</strong> {selectedTicket.assessment.priority_policy}</p>
+                                    </>
+                                ) : <p>No assessment recorded for this ticket.</p>}
+                            </section>
 
                             <TicketChatHistory key={selectedTicket.id} ticketId={selectedTicket.id} user={user}/>
                             <div className="pt-4 border-t border-slate-100 flex items-center justify-between">

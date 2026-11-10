@@ -108,6 +108,7 @@ class Ticket(Base):
     company = relationship("Company", back_populates="tickets")
     requester = relationship("User", foreign_keys=[requester_id])
     assignee = relationship("User", foreign_keys=[assignee_id])
+    assessment = relationship("TicketAssessment", uselist=False, cascade="all, delete-orphan", lazy="selectin")
     sla_tracking = relationship("TicketSLA", back_populates="ticket", uselist=False, cascade="all, delete-orphan")
     comments = relationship("TicketComment", back_populates="ticket", cascade="all, delete-orphan")
     audit_logs = relationship("TicketAuditLog", back_populates="ticket", cascade="all, delete-orphan")
@@ -157,3 +158,15 @@ class TicketAuditLog(Base):
     
     ticket = relationship("Ticket", back_populates="audit_logs")
     user = relationship("User", foreign_keys=[user_id])
+
+class TicketAssessment(Base):
+    __tablename__ = 'ticket_assessments'
+
+    ticket_id = Column(UUID(as_uuid=True), ForeignKey('tickets.id', ondelete='CASCADE'), primary_key=True)
+    source = Column(String, nullable=False)
+    model = Column(String, nullable=True)
+    incident_type = Column(String, nullable=False)
+    reason = Column(Text, nullable=False)
+    recommendation = Column(Text, nullable=False)
+    fallback_reason = Column(String, nullable=True)
+    priority_policy = Column(String, nullable=False)

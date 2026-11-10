@@ -44,7 +44,7 @@ class GeminiTimeoutTransport(unittest.TestCase):
             for headers in (None, {'X-Server-Timeout': '12'}):
                 client = genai.Client(api_key='offline-fake-key', vertexai=False, enterprise=False,
                     http_options=types.HttpOptions(timeout=15001, headers=headers,
-                        retry_options=types.HttpRetryOptions(attempts=1), client_args={'trust_env': False}))
+                        retry_options=types.HttpRetryOptions(attempts=1), client_args={'trust_env': False}, async_client_args={'trust_env': False}))
                 try:
                     client.models.generate_content(model='offline-model', contents='synthetic',
                         config=types.GenerateContentConfig(automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)))
@@ -66,3 +66,30 @@ class GeminiTimeoutTransport(unittest.TestCase):
         self.assertEqual(len(requests), 1)
         self.assertEqual(requests[0].headers['x-server-timeout'], '12')
         self.assertEqual(requests[0].extensions['timeout']['read'], 15.0)
+
+
+    def test_incident_structured_schema_and_key_header_on_sdk_wire(self):
+        from services.incident_assessment import IncidentAnalysis, SYSTEM
+
+        def structured(client, request, **kwargs):
+            self.requests.append(request)
+            return httpx.Response(200, request=request, json={'candidates': [{
+                'finishReason': 'STOP', 'content': {'role': 'model', 'parts': [{'text': json.dumps({
+                    'incident_type': 'SERVICE_DISRUPTION', 'impact': 'SIGNIFICANT', 'urgency': 'HIGH',
+                    'reason': 'Several demo sites affected', 'recommendation': 'Confirm scope with SOC',
+                })}]},
+            }]})
+
+        with patch.object(httpx.Client, 'send', structured):
+            analysis = provider._generate('{"description":"Several demo sites affected"}', SYSTEM, IncidentAnalysis)
+        self.assertEqual(analysis.incident_type, 'SERVICE_DISRUPTION')
+        self.assertEqual(len(self.requests), 1)
+        request = self.requests[0]
+        self.assertEqual(request.headers['x-goog-api-key'], 'offline-fake-key')
+        self.assertNotIn('offline-fake-key', str(request.url))
+        body = json.loads(request.content)
+        config = body['generationConfig']
+        self.assertEqual(config['responseMimeType'], 'application/json')
+        self.assertEqual(set(config['responseJsonSchema']['properties']),
+                         {'incident_type', 'impact', 'urgency', 'reason', 'recommendation'})
+        self.assertNotIn('tools', body)

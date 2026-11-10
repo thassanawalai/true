@@ -8,7 +8,7 @@ import json
 import unittest
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from core.database import SessionLocal
 from models.models import Ticket
@@ -46,7 +46,7 @@ class PortalAPI(unittest.TestCase):
     def tearDownClass(cls):
         with SessionLocal() as db:
             for ticket_id in cls.created:
-                ticket = db.get(Ticket, ticket_id)
+                ticket = db.get(Ticket, UUID(ticket_id))
                 if ticket:
                     db.delete(ticket)
             db.commit()

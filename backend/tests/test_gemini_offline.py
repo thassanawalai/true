@@ -22,17 +22,28 @@ from core.database import Base, get_db as room_db
 from core.dependencies import get_db as auth_db
 from core.demo_auth import issue_token
 from core.demo_telemetry import FIXTURES
-from models.models import Company, User, RoleEnum, Ticket
+from models.models import Company, ImpactEnum, PriorityEnum, RoleEnum, SLAPolicy, Ticket, UrgencyEnum, User
 from models.customer_data import CustomerAsset, LogCollector, CustomerLog
 from models.chat import ChatRoom
 from services import gemini_support as provider, temporary_chat as live
+from services.incident_assessment import priority_for
+from core.rate_limits import FixedWindow
+from routers import demo_auth
 
 
 class GeminiOffline(unittest.TestCase):
     def setUp(self):
         self.env = patch.dict(os.environ, {'GEMINI_ENABLED': 'true', 'GEMINI_API_KEY': 'offline-secret-API-key',
-            'GEMINI_MODEL': 'offline-configured-model', 'DEMO_SESSION_SECRET': 'offline-demo-session-secret-at-least-32'})
+            'GEMINI_MODEL': 'offline-configured-model', 'DEMO_SESSION_SECRET': 'offline-demo-session-secret-at-least-32',
+            'DEMO_AUTH_MODE': 'password', 'DEMO_KB_CHROMA_ENABLED': 'false',
+            'DEMO_LOGIN_PASSWORDS_JSON': json.dumps({name + '@example.test': 'mock-password-fixture-' + name
+                for name in ('a1', 'a2', 'b1', 'admin', 'support')})})
         self.env.start(); self.addCleanup(self.env.stop)
+        for target, attr, seconds in ((provider, '_minute', 60), (provider, '_day', 86400),
+                                      (demo_auth, '_login_attempts', 60)):
+            limiter = patch.object(target, attr, FixedWindow(seconds))
+            limiter.start()
+            self.addCleanup(limiter.stop)
         self.network = patch.object(socket.socket, 'connect', side_effect=AssertionError('Offline suite prohibits network'))
         self.network.start(); self.addCleanup(self.network.stop)
         self.engine = create_engine('sqlite://', connect_args={'check_same_thread': False}, poolclass=StaticPool)
@@ -294,6 +305,7 @@ class GeminiOffline(unittest.TestCase):
         def factory():
             return genai.Client(api_key='offline-fake-key', vertexai=False, enterprise=False,
                 http_options=types.HttpOptions(httpx_client=httpx.Client(transport=httpx.MockTransport(transport)),
+                    async_client_args={'trust_env': False},
                     timeout=provider.HTTP_TIMEOUT_MS, retry_options=types.HttpRetryOptions(attempts=1)))
         with patch.object(provider, 'new_client', side_effect=factory):
             response = self.ask('suspicious login')
@@ -311,3 +323,165 @@ class GeminiOffline(unittest.TestCase):
         for name in ('DEMO_SESSION_SECRET', 'DATABASE_URL'):
             with patch.dict(os.environ, {name: 'offline-sensitive-value'}):
                 self.assertIsNone(provider.validate_text('ตรวจสอบบัญชี offline-sensitive-value'))
+
+
+    def structured(self, **data):
+        self.sdk.models.generate_content.return_value = SimpleNamespace(
+            candidates=[SimpleNamespace(finish_reason='STOP')],
+            text=json.dumps(data, ensure_ascii=False),
+        )
+
+    def incident(self, **overrides):
+        data = {'incident_type': 'SERVICE_DISRUPTION', 'impact': 'EXTENSIVE', 'urgency': 'HIGH',
+                'reason': 'ระบบหลักหยุดทำงานหลายไซต์', 'recommendation': 'ตรวจสอบผลกระทบกับ SOC'}
+        self.structured(**(data | overrides))
+
+    def ticket(self, description='ระบบหลักหยุดทำงานหลายไซต์ ขณะนี้ผู้ใช้ทั้งหมดเข้าไม่ได้', name='a1'):
+        return self.req('/api/tickets/', name, {'subject': 'Synthetic incident', 'description': description})
+
+    def test_ticket_context_schema_persistence_sla_and_tenant_visibility(self):
+        self.incident()
+        response = self.ticket()
+        self.assertEqual(response.status_code, 200, response.text)
+        ticket = response.json()
+        self.assertEqual((ticket['impact'], ticket['urgency'], ticket['priority']), ('EXTENSIVE', 'HIGH', 'P1'))
+        self.assertEqual(ticket['assessment']['source'], 'gemini')
+        self.assertEqual(ticket['assessment']['priority_policy'], 'soc-severity-v1')
+        self.assertIn('หลายไซต์', ticket['assessment']['reason'])
+        call = self.sdk.models.generate_content.call_args.kwargs
+        self.assertEqual(json.loads(call['contents'])['description'], ticket['description'])
+        self.assertNotIn('priority', call['config'].response_json_schema['properties'])
+        self.assertEqual(self.req('/api/tickets/' + ticket['id'], 'a2').json()['assessment'], ticket['assessment'])
+        self.assertEqual(self.req('/api/tickets/' + ticket['id'], 'b1').status_code, 404)
+        self.assertEqual(self.req('/api/tickets/' + ticket['id'], 'support').status_code, 200)
+        with self.Session() as db:
+            stored = db.query(Ticket).filter_by(ticket_number=ticket['ticket_number']).one()
+            self.assertEqual(db.get(SLAPolicy, stored.sla_policy_id).priority, PriorityEnum.P1)
+
+    def test_english_negated_keyword_uses_model_ratings_and_checks_entire_policy(self):
+        self.incident(incident_type='UNKNOWN', impact='MINOR', urgency='LOW',
+                      reason='No ransomware found. This is a completed training exercise.',
+                      recommendation='Record the exercise outcome.')
+        response = self.ticket('No ransomware found. The exercise ended yesterday.')
+        self.assertEqual(response.json()['priority'], 'P4', response.text)
+        expected = (('P1', 'P1', 'P1', 'P1'), ('P1', 'P2', 'P2', 'P2'),
+                    ('P1', 'P2', 'P3', 'P3'), ('P1', 'P2', 'P3', 'P4'))
+        for row, impact in enumerate(ImpactEnum):
+            for col, urgency in enumerate(UrgencyEnum):
+                self.assertEqual(priority_for(impact, urgency).value, expected[row][col])
+
+    def test_ticket_fallback_for_malformed_disabled_and_sensitive_reports(self):
+        self.incident(impact='UNTRUSTED', priority='P1')
+        invalid = self.ticket('CRITICAL ransomware is mentioned in a training example.').json()
+        self.assertEqual(invalid['priority'], 'P3')
+        self.assertEqual(invalid['assessment']['source'], 'fallback')
+        self.assertEqual(invalid['assessment']['fallback_reason'], 'invalid_response')
+        self.sdk.reset_mock()
+        with patch.dict(os.environ, {'GEMINI_ENABLED': 'false'}):
+            self.assertEqual(self.ticket().json()['assessment']['fallback_reason'], 'provider_disabled')
+        self.assertEqual(self.ticket('Synthetic report password=private-value').json()['assessment']['fallback_reason'], 'input_guard')
+        self.assertEqual(self.ticket(name=None).status_code, 401)
+        self.sdk.models.generate_content.assert_not_called()
+
+    def test_confirmed_chat_ticket_uses_only_explicit_report_and_is_idempotent(self):
+        room_id = self.open_room()
+        path = '/api/chat-rooms/' + room_id
+        self.assertEqual(self.req(path + '/messages', payload={'content': 'assets private-chat-marker'}).status_code, 200)
+        self.sdk.reset_mock()
+        self.incident()
+        payload = {'subject': 'Confirmed exercise', 'description': 'Synthetic service outage at two sites'}
+        result = self.req(path + '/ticket', payload=payload)
+        self.assertEqual(result.status_code, 200, result.text)
+        ticket_id = result.json()['ticket_id']
+        self.assertEqual(self.req(path + '/ticket', payload=payload).json()['ticket_id'], ticket_id)
+        self.sdk.models.generate_content.assert_called_once()
+        self.assertEqual(json.loads(self.sdk.models.generate_content.call_args.kwargs['contents']), payload)
+        self.assertEqual(self.req('/api/tickets/' + ticket_id).json()['assessment']['source'], 'gemini')
+
+    def test_kb_tenant_citations_on_all_chat_routes(self):
+        question = 'What is the dashboard port in the knowledge base?'
+        self.structured(answer='Use port 8081.', citations=['KB-002'])
+        result = self.ask(question).json()
+        self.assertEqual(result['mode'], 'gemini_knowledge_base')
+        self.assertEqual([item['id'] for item in result['citations']], ['KB-002'])
+        sent = self.sdk.models.generate_content.call_args.kwargs['contents']
+        self.assertIn('8081', sent)
+        self.assertNotIn('9443', sent)
+        self.structured(answer='ใช้พอร์ต 9443', citations=['KB-004'])
+        room = self.open_room('b1')
+        response = self.req('/api/chat-rooms/' + room + '/messages', 'b1', {'content': 'พอร์ต dashboard เท่าไหร่'})
+        self.assertIn('KB-004', response.json()['messages'][-1]['content'])
+        sent = self.sdk.models.generate_content.call_args.kwargs['contents']
+        self.assertIn('9443', sent)
+        self.assertNotIn('8081', sent)
+        result = self.req('/api/chat', 'admin', {'message': question, 'company_id': str(self.companies['B'])}).json()
+        self.assertEqual(result['citations'][0]['id'], 'KB-004')
+        self.sdk.reset_mock()
+        self.assertEqual(self.ask(question, company_id=str(self.companies['B'])).status_code, 403)
+        self.assertEqual(self.ask(question, name='admin').status_code, 422)
+        self.sdk.models.generate_content.assert_not_called()
+
+    def test_kb_rejects_invented_citations_and_returns_authorized_fallback(self):
+        self.structured(answer='Other tenant port 9443.', citations=['KB-004'])
+        result = self.ask('What is the dashboard port?').json()
+        self.assertEqual(result['mode'], 'knowledge_base_fallback')
+        self.assertEqual(result['fallback_reason'], 'invalid_citations')
+        self.assertNotIn('9443', result['answer'])
+        self.sdk.reset_mock()
+        result = self.ask('Password reset knowledge base').json()
+        self.assertEqual(result['citations'], [])
+        self.sdk.models.generate_content.assert_not_called()
+        with patch.dict(os.environ, {'GEMINI_ENABLED': 'false'}):
+            result = self.ask('How to troubleshoot log loss?').json()
+        self.assertEqual(result['mode'], 'knowledge_base_fallback')
+        self.assertIn('disk space', result['answer'])
+        self.assertEqual(result['citations'][0]['id'], 'KB-001')
+
+    def test_optional_chroma_scopes_query_and_rechecks_returned_metadata(self):
+        from rag import vector_db
+
+        def chunk(scope, body):
+            return SimpleNamespace(metadata={'user_company': scope, 'source': 'Demo runbook'}, page_content=body)
+
+        a, b = str(self.companies['A']), str(self.companies['B'])
+        vector = MagicMock()
+        vector.similarity_search.return_value = [
+            chunk(b, 'forbidden-tenant-chunk'), chunk('public', 'shared-chunk'),
+            chunk(a, 'authorized-private-chunk'),
+        ]
+        self.structured(answer='Consult the two authorized runbooks.', citations=['PLAYBOOK-2', 'PLAYBOOK-3'])
+        with patch.dict(os.environ, {'DEMO_KB_CHROMA_ENABLED': 'true'}), patch.object(vector_db, 'store', return_value=vector):
+            result = self.ask('How does the continuity runbook handle recovery?').json()
+        self.assertEqual(result['mode'], 'gemini_knowledge_base')
+        self.assertEqual(vector.similarity_search.call_args.kwargs['filter'], {'user_company': {'$in': ['public', a]}})
+        sent = self.sdk.models.generate_content.call_args.kwargs['contents']
+        self.assertIn('shared-chunk', sent)
+        self.assertIn('authorized-private-chunk', sent)
+        self.assertNotIn('forbidden-tenant-chunk', sent)
+
+    def test_usage_limits_are_shared_across_chat_and_ticket_and_fail_closed(self):
+        with patch.dict(os.environ, {'GEMINI_USER_PER_MINUTE': '1', 'GEMINI_MAX_CALLS_PER_DAY': '2'}):
+            self.assertEqual(self.ask('assets').json()['mode'], 'gemini_demo')
+            self.assertEqual(self.ticket().json()['assessment']['fallback_reason'], 'usage_limit')
+            self.assertEqual(self.ask('assets', 'a2').json()['mode'], 'gemini_demo')
+            self.assertEqual(self.ticket(name='b1').json()['assessment']['fallback_reason'], 'usage_limit')
+        self.assertEqual(self.sdk.models.generate_content.call_count, 2)
+
+    def test_password_login_requires_valid_credentials_rejects_old_mock_tokens_and_limits_attempts(self):
+        user_id = str(self.users['a1'])
+        with patch.dict(os.environ, {'GEMINI_ENABLED': 'false', 'DEMO_AUTH_MODE': 'mock'}):
+            stale = self.req('/api/demo-auth/login', None, {'user_id': user_id}).json()['token']
+        response = self.client.get('/api/demo-auth/me', headers={'Authorization': 'Bearer ' + stale})
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(self.req('/api/demo-auth/login', None, {'user_id': user_id}).status_code, 401)
+        bad = self.req('/api/demo-auth/login', None, {'user_id': user_id, 'password': 'secret-fixture-' * 100})
+        self.assertEqual(bad.status_code, 422)
+        self.assertNotIn('secret-fixture', bad.text)
+        logged_in = self.req('/api/demo-auth/login', None, {
+            'user_id': user_id, 'password': 'mock-password-fixture-a1',
+        })
+        self.assertEqual(logged_in.status_code, 200, logged_in.text)
+        self.assertNotIn('mock-password-fixture-a1', logged_in.text)
+        for _ in range(4):
+            self.assertEqual(self.req('/api/demo-auth/login', None, {'user_id': user_id}).status_code, 401)
+        self.assertEqual(self.req('/api/demo-auth/login', None, {'user_id': user_id}).status_code, 429)

@@ -7,12 +7,12 @@ from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
 from core.database import get_db
 from core.demo_auth import current_user, internal
-from models.models import User, Ticket
+from models.models import Company, User, Ticket
 from models.chat import ChatRoom, RoomMessage
 from services.support_answers import answer_question
 from routers.customer_data import authorized_company
 from services import temporary_chat as live
-from services.ticket_service import create_ticket_from_ai
+from services.ticket_service import assess_ticket, create_ticket_from_ai
 
 router = APIRouter(prefix='/api/chat-rooms', tags=['Private Chat'])
 
@@ -200,20 +200,36 @@ def link_ticket(room_id: UUID, payload: LinkInput, db: Session = Depends(get_db)
         room = temporary(room_id, user)
         if not any(message['role'] == 'assistant' for message in room['messages']):
             raise HTTPException(409, 'Ask the chatbot before creating a ticket from chat')
-        result = create_ticket_from_ai(db, issue_description=payload.description, subject=payload.subject.strip(),
-                                      company_id=user.company_id, requester_id=user.id, commit=False)
-        if not result['success']:
-            raise HTTPException(500, 'Unable to create ticket')
-        try:
-            saved = ChatRoom(id=room_id, owner_id=user.id, company_id=user.company_id,
-                             ticket_id=result['ticket_id'], created_at=room['created_at'])
-            db.add(saved)
-            db.flush()
-            for index, message in enumerate(room['messages']):
-                db.add(RoomMessage(room_id=room_id, sequence=index, **message))
-            db.commit()
-        except Exception:
-            db.rollback()
-            raise HTTPException(500, 'Unable to save ticket and history; temporary chat is unchanged')
-        del live.rooms[room_id]
-        return snapshot(db, saved)
+        if room_id in live.promoting:
+            raise HTTPException(409, 'Ticket creation already in progress')
+        live.promoting.add(room_id)
+    try:
+        company = db.get(Company, user.company_id)
+        assessment = assess_ticket(payload.subject.strip(), payload.description, user, company.name)
+        with live.lock:
+            room = temporary(room_id, user)
+            return promote(db, room, user, payload, assessment)
+    finally:
+        with live.lock:
+            live.promoting.discard(room_id)
+
+
+def promote(db, room, user, payload, assessment):
+    room_id = room['id']
+    result = create_ticket_from_ai(db, issue_description=payload.description, subject=payload.subject.strip(),
+                                  company_id=user.company_id, requester_id=user.id, commit=False, assessed=assessment)
+    if not result['success']:
+        raise HTTPException(500, 'Unable to create ticket')
+    try:
+        saved = ChatRoom(id=room_id, owner_id=user.id, company_id=user.company_id,
+                         ticket_id=result['ticket_id'], created_at=room['created_at'])
+        db.add(saved)
+        db.flush()
+        for index, message in enumerate(room['messages']):
+            db.add(RoomMessage(room_id=room_id, sequence=index, **message))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(500, 'Unable to save ticket and history; temporary chat is unchanged')
+    del live.rooms[room_id]
+    return snapshot(db, saved)

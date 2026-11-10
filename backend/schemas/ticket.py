@@ -1,5 +1,4 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, ConfigDict
 from uuid import UUID
 from datetime import datetime
 from models.models import ImpactEnum, UrgencyEnum, PriorityEnum
@@ -13,6 +12,18 @@ class TicketCreate(BaseModel):
     urgency: UrgencyEnum
     company_id: UUID
 
+class AssessmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    source: str
+    model: str | None
+    incident_type: str
+    reason: str
+    recommendation: str
+    fallback_reason: str | None
+    priority_policy: str
+
+
 class TicketResponse(BaseModel):
     id: UUID
     company_id: UUID
@@ -25,6 +36,7 @@ class TicketResponse(BaseModel):
     urgency: UrgencyEnum
     priority: PriorityEnum
     created_at: datetime
+    assessment: AssessmentResponse | None = None
     
     class Config:
         from_attributes = True

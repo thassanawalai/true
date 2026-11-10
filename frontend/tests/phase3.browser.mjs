@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const fixture = JSON.parse(process.env.PHASE3_BROWSER_FIXTURE);
 const base = process.env.PORTAL_URL || 'http://127.0.0.1:5173';
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE });
 const pages = {};
 const errors = [];
 let passed = 0;
@@ -89,6 +89,7 @@ try {
   await check('Customer explicitly confirms ticket; full customer/bot/SOC history is linked', async () => {
     await a1.getByRole('button', { name: 'Create ticket from chat' }).click();
     await a1.getByLabel('Chat ticket subject').fill('Browser ticket ' + fixture.marker);
+    await a1.getByLabel('Chat ticket description').fill('Synthetic incident description');
     assert.equal((await (await read(a1, '/chat-rooms/' + roomId)).json()).ticket_id, null);
     await a1.getByRole('button', { name: 'Confirm create ticket' }).click();
     await shown(a1.getByText(/Ticket-linked history is saved/));
@@ -97,6 +98,8 @@ try {
     await a1.getByRole('button', { name: 'My Company Tickets', exact: true }).click();
     await a1.getByRole('cell', { name: 'Browser ticket ' + fixture.marker, exact: true }).click();
     await shown(a1.getByText('Live SOC reply admin', { exact: true }));
+    await shown(a1.getByRole('region', { name: 'AI Assessment' }).getByText(/Fallback — SOC review required/));
+    await shown(a1.getByText('Synthetic incident description', { exact: true }));
   });
   await check('A2 shares ticket metadata but private transcript stays inaccessible; B cannot see ticket', async () => {
     await a2.getByRole('button', { name: 'My Company Tickets', exact: true }).click();

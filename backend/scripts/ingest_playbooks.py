@@ -1,4 +1,6 @@
+import argparse
 import sys
+from uuid import UUID
 from pathlib import Path
 
 from langchain_core.documents import Document
@@ -30,7 +32,7 @@ def load_playbook(file_path: Path) -> list[Document]:
     return [Document(page_content=text, metadata={"source": file_path.name})]
 
 
-def ingest_documents(company_name="True Digital Group (Demo)"):
+def ingest_documents(scope):
     """Read playbooks, split them into chunks, and save them to ChromaDB."""
     if not DOCS_DIR.exists():
         DOCS_DIR.mkdir(parents=True)
@@ -66,13 +68,18 @@ def ingest_documents(company_name="True Digital Group (Demo)"):
             save_chunks_to_db(
                 chunks=chunk_texts,
                 source_url=file_path.name,
-                user_company=company_name,
+                user_company=scope,
             )
         except Exception as exc:
             print(f"[Error] Failed to process {file_path.name}: {exc}")
 
 
 if __name__ == "__main__":
-    print("--- Starting Playbook Ingestion ---")
-    ingest_documents()
-    print("--- Ingestion Complete ---")
+    parser = argparse.ArgumentParser(description="Ingest approved synthetic demo playbooks.")
+    parser.add_argument("--scope", required=True, help="'public' or the demo company UUID")
+    args = parser.parse_args()
+    try:
+        scope = args.scope if args.scope == "public" else str(UUID(args.scope))
+    except ValueError:
+        parser.error("--scope must be public or a company UUID")
+    ingest_documents(scope)

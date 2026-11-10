@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import Literal
@@ -42,6 +43,14 @@ app.include_router(customer_data.router)
 app.include_router(customer_chat.router)
 app.include_router(chat_rooms.router)
 # Vite proxies /api locally; explicit cross-origin access is disabled by default.
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(_request, exc):
+    # Validation errors can include raw passwords, reports, or chat prompts.
+    return JSONResponse(status_code=422, content={'detail': [
+        {'loc': error['loc'], 'msg': error['msg'], 'type': error['type']} for error in exc.errors()
+    ]})
+
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]

@@ -34,15 +34,15 @@ function Chat({ companyId, internal }) {
   const disabled = busy || (internal && !companyId);
   return <main className="max-w-3xl mx-auto p-5">
     <h2 className="text-xl font-bold mb-2">{internal ? 'Company Q&A' : 'Support Assistant'}</h2>
-    <p className="text-sm text-slate-400 mb-4">Demo telemetry Q&A with rule-based fallback. Chat stays in this view only.</p>
+    <p className="text-sm text-slate-400 mb-4">Knowledge Base and demo telemetry Q&A with fallback. Chat stays in this view only.</p>
     <div className="space-y-3 min-h-[55vh]" aria-live="polite">
       {!messages.length && <p className="text-slate-400">{internal && !companyId ? 'Select a customer company to begin.' : 'Ask about assets, IP addresses, log collectors, or security events.'}</p>}
-      {messages.map((message, index) => <div key={index} className={'rounded-xl p-3 ' + (message.role === 'user' ? 'bg-blue-900 ml-12' : 'bg-slate-800 mr-12')}><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown></div>)}
+      {messages.map((message, index) => <div key={index} className={'rounded-xl p-3 ' + (message.role === 'user' ? 'bg-blue-900 ml-12' : 'bg-slate-800 mr-12')}><ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={['img', 'a']} unwrapDisallowed>{message.content}</ReactMarkdown></div>)}
       {busy && <p role="status">Loading answer…</p>}
     </div>
     {error && <p role="alert" className="text-red-300 my-3">{error} Please try again.</p>}
     <form onSubmit={send} className="flex gap-2 mt-4">
-      <input aria-label="Chat message" maxLength={1000} disabled={disabled} className="min-w-0 flex-1 bg-slate-800 rounded p-3" value={input} onChange={event => setInput(event.target.value)} placeholder="Ask about your company telemetry…" />
+      <input aria-label="Chat message" maxLength={1000} disabled={disabled} className="min-w-0 flex-1 bg-slate-800 rounded p-3" value={input} onChange={event => setInput(event.target.value)} placeholder="Ask about playbooks or company telemetry…" />
       <button disabled={disabled || !input.trim()} className="bg-blue-600 px-5 rounded disabled:opacity-50">Send</button>
     </form>
   </main>;
@@ -94,6 +94,8 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [selected, setSelected] = useState('');
+  const [password, setPassword] = useState('');
+  const passwordRequired = users.some(user => user.id === selected && user.password_required);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -117,11 +119,11 @@ export default function App() {
     return () => controller.abort();
   }, [retry]);
   const login = async () => {
-    if (busy || !selected) return;
+    if (busy || !selected || (passwordRequired && !password)) return;
     setBusy(true); setError('');
     try {
-      const result = await api('/demo-auth/login', { method: 'POST', body: JSON.stringify({ user_id: selected }) });
-      sessionStorage.setItem('demo_token', result.token); setUser(result.user);
+      const result = await api('/demo-auth/login', { method: 'POST', body: JSON.stringify({ user_id: selected, ...(passwordRequired ? { password } : {}) }) });
+      sessionStorage.setItem('demo_token', result.token); setPassword(''); setUser(result.user);
     } catch (error) { setError(error.message); }
     finally { setBusy(false); }
   };
@@ -132,11 +134,15 @@ export default function App() {
       <h1 className="text-2xl font-bold">SOC AI Support — Demo Login</h1>
       <p className="text-slate-400 text-sm">Demo identities only. Not production authentication.</p>
       {loading && <p role="status">Loading demo session…</p>}
-      <select aria-label="Select demo user" disabled={loading || busy} className="w-full bg-slate-800 p-3 rounded" value={selected} onChange={event => setSelected(event.target.value)}>
+      <select aria-label="Select demo user" disabled={loading || busy} className="w-full bg-slate-800 p-3 rounded" value={selected} onChange={event => { setSelected(event.target.value); setPassword(''); }}>
         <option value="">Select demo user</option>
         {users.map(user => <option key={user.id} value={user.id}>{user.name} — {user.company} ({user.role})</option>)}
       </select>
-      <button disabled={!selected || busy || loading} onClick={login} className="w-full rounded bg-blue-600 p-3 disabled:opacity-50">{busy ? 'Logging in…' : 'Login'}</button>
+      {passwordRequired && <input aria-label="Demo password" type="password" autoComplete="current-password"
+        className="w-full bg-slate-800 p-3 rounded" value={password} maxLength={256} disabled={busy}
+        onChange={event => setPassword(event.target.value)}
+        onKeyDown={event => { if (event.key === 'Enter') login(); }} />}
+      <button disabled={!selected || busy || loading || (passwordRequired && !password)} onClick={login} className="w-full rounded bg-blue-600 p-3 disabled:opacity-50">{busy ? 'Logging in…' : 'Login'}</button>
       {error && <p role="alert" className="text-red-400">{error}</p>}
       {!loading && !users.length && !error && <p>No demo users available.</p>}
       {!loading && <button onClick={() => { setLoading(true); setError(''); setRetry(value => value + 1); }}>Reload demo users</button>}

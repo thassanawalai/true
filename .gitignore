@@ -21,3 +21,5 @@ __pycache__/
 # Virtual environments
 .venv/
 venv/
+service-account*.json
+*service_account*.json

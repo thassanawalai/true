@@ -1,15 +1,23 @@
 """Explicit demo-only user picker; not suitable for internet-facing production."""
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+import hmac
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from core.dependencies import get_db
-from core.demo_auth import issue_token, current_user, internal
+from core.demo_auth import issue_token, current_user, internal, password_required, demo_passwords
 from models.models import User, Company, RoleEnum
+from core.rate_limits import FixedWindow
 
 router = APIRouter(prefix="/api/demo-auth", tags=["Demo Login"])
 
+_login_attempts = FixedWindow(60)
+
+
 class LoginRequest(BaseModel):
-    user_id: str
+    user_id: UUID
+    password: str = Field(default="", max_length=256)
 
 def public_user(user, company):
     return {"id": str(user.id), "name": user.full_name, "role": user.role.value,
@@ -19,11 +27,24 @@ def public_user(user, company):
 def demo_users(db: Session = Depends(get_db)):
     users = db.query(User).order_by(User.email).all()
     companies = {c.id: c for c in db.query(Company).all()}
-    return [public_user(u, companies.get(u.company_id)) for u in users if u.email.endswith("@example.test")]
+    required = password_required()
+    credentials = demo_passwords() if required else {}
+    return [dict(public_user(u, companies.get(u.company_id)), password_required=required) for u in users
+            if u.email.endswith("@example.test") and (not required or u.email in credentials)]
 
 @router.post("/login")
-def login(request: LoginRequest, db: Session = Depends(get_db)):
+def login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db)):
+    required = password_required()
+    if required:
+        client = http_request.client.host if http_request.client else 'unknown'
+        if not _login_attempts.take(('global', 120), (('ip', client), 12), (('account', request.user_id), 6)):
+            raise HTTPException(429, 'Too many login attempts', headers={'Retry-After': '60'})
     user = db.query(User).filter(User.id == request.user_id, User.email.endswith("@example.test")).first()
+    if required:
+        expected = demo_passwords().get(user.email) if user else None
+        matches = hmac.compare_digest(request.password.encode(), (expected or 'invalid-login-placeholder').encode())
+        if not expected or not matches:
+            raise HTTPException(401, 'Invalid demo credentials')
     if not user:
         raise HTTPException(404, "Demo user not found")
     company = db.query(Company).filter(Company.id == user.company_id).first()

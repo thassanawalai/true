@@ -13,7 +13,7 @@ export const api = async (path, options = {}) => {
       if (typeof detail === 'string') message = detail;
       else if (Array.isArray(detail)) message = detail.map(item => item.msg).join('; ');
     } catch { /* Keep a readable fallback for proxy/network errors. */ }
-    if (response.status === 401 && token === getToken()) {
+    if (response.status === 401 && token && token === getToken()) {
       sessionStorage.removeItem('demo_token');
       window.dispatchEvent(new Event('demo-session-expired'));
     }

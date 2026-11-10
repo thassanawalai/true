@@ -9,7 +9,7 @@ import os
 import time
 import unittest
 from unittest.mock import patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
@@ -152,7 +152,7 @@ class ChatAPI(unittest.TestCase):
         with SessionLocal() as db:
             self.assertEqual(db.query(ChatRoom).filter(ChatRoom.company_id.in_(self.companies)).count(), 1)
             self.assertEqual(db.query(Ticket).filter(Ticket.company_id.in_(self.companies)).count(), 1)
-            self.assertEqual(len(db.get(ChatRoom, a['id']).messages), 6)
+            self.assertEqual(len(db.get(ChatRoom, UUID(a['id'])).messages), 6)
         self.assertNotEqual(self.open()['id'], a['id'])  # next conversation is independent
 
     def test_all_endpoints_reject_missing_and_expired_sessions(self):

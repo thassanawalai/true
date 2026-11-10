@@ -11,6 +11,7 @@ export function RoomConversation({ roomId, user, onLinked }) {
   const [busy, setBusy] = useState(false);
   const [input, setInput] = useState('');
   const [subject, setSubject] = useState('');
+  const [description, setDescription] = useState('');
   const [confirming, setConfirming] = useState(false);
   const pending = useRef(false);
   const internal = ['ADMIN', 'SUPPORT'].includes(user.role);
@@ -55,11 +56,11 @@ export function RoomConversation({ roomId, user, onLinked }) {
       <p className="text-sm text-slate-400">{room.temporary
         ? 'Temporary live chat: expires 30 minutes after the last message and disappears on backend restart. Refresh/navigation reconnects only while it is active. SOC can view and reply. No durable history until you create a ticket.'
         : 'Ticket-linked history is saved. Only this chat owner and SOC staff can access this conversation.'}</p>
-      {!room.messages.length && <p>Ask the chatbot about assets, collectors, or security events to begin.</p>}
+      {!room.messages.length && <p>Ask the chatbot about playbooks, assets, collectors, or security events to begin.</p>}
       <div className="space-y-3" aria-live="polite">
         {room.messages.map(message => <article key={message.id} className={'rounded-xl p-3 ' + (message.role === 'customer' ? 'bg-blue-900 ml-8' : 'bg-slate-800 mr-8')}>
           <p className="text-xs text-slate-300 mb-1">{message.sender_name} · {message.role}</p>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={['img', 'a']} unwrapDisallowed>{message.content}</ReactMarkdown>
         </article>)}
       </div>
       {busy && <p role="status">Sending…</p>}
@@ -76,9 +77,12 @@ export function RoomConversation({ roomId, user, onLinked }) {
       }}>Discard temporary chat</button>}
       {!internal && room.temporary && room.messages.some(message => message.role === 'assistant') && <>
         <button disabled={busy} onClick={() => setConfirming(!confirming)} className="bg-blue-600 rounded p-2">Create ticket from chat</button>
-        {confirming && <form className="space-y-2" onSubmit={event => { event.preventDefault(); if (subject.trim()) mutate('/ticket', { subject: subject.trim() }); }}>
-          <p className="text-sm">Create a company-visible ticket and save this private conversation for you and SOC. The ticket subject is visible to your company; chat messages remain private.</p>
+        {confirming && <form className="space-y-2" onSubmit={event => { event.preventDefault(); if (subject.trim()) mutate('/ticket', { subject: subject.trim(), ...(description.trim() ? { description: description.trim() } : {}) }); }}>
+          <p className="text-sm">Create a company-visible ticket and save this private conversation for you and SOC. The ticket subject and description are visible to your company; chat messages remain private.</p>
           <input aria-label="Chat ticket subject" required maxLength={200} value={subject} onChange={event => setSubject(event.target.value)} className="bg-slate-800 rounded p-3 w-full" placeholder="Ticket subject"/>
+          <textarea aria-label="Chat ticket description" maxLength={5000} value={description}
+            onChange={event => setDescription(event.target.value)} className="bg-slate-800 rounded p-3 w-full"
+            placeholder="Incident description for assessment (optional)"/>
           <button disabled={busy || !subject.trim()} className="bg-blue-600 rounded p-2 mr-3">Confirm create ticket</button>
           <button type="button" disabled={busy} onClick={() => setConfirming(false)}>Cancel</button>
         </form>}

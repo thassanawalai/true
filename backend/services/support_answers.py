@@ -4,6 +4,7 @@ from models.models import Company
 from models.customer_data import CustomerAsset, LogCollector, CustomerLog
 from routers.customer_data import authorized_company
 from services import gemini_support
+from services.knowledge_answers import COMPANY_SCOPES, answer_from_knowledge
 
 TOPICS = {
     'ransomware': ('ransomware', 'เรียกค่าไถ่'),
@@ -58,6 +59,12 @@ def verified_demo(company_name, assets, collectors, logs):
 
 def answer_question(message, db, user, company_id=None, history=None):
     cid = authorized_company(db, user, company_id)  # before any retrieval/provider
+    company = db.get(Company, cid)
+    is_demo = company and company.name in COMPANY_SCOPES and user.email.endswith('@example.test')
+    if is_demo:
+        kb_answer = answer_from_knowledge(message, company, user)
+        if kb_answer is not None:
+            return {**kb_answer, 'company_id': str(cid), 'category': 'knowledge_base'}
     assets = db.query(CustomerAsset).filter(CustomerAsset.company_id == cid).order_by(CustomerAsset.ip_address).limit(20).all()
     collectors = db.query(LogCollector).filter(LogCollector.company_id == cid).order_by(LogCollector.name).limit(10).all()
     logs = db.query(CustomerLog).filter(CustomerLog.company_id == cid).order_by(CustomerLog.occurred_at.desc()).limit(20).all()
@@ -73,14 +80,13 @@ def answer_question(message, db, user, company_id=None, history=None):
     result = {'answer': answer, 'source': 'tenant_scoped_mock_data', 'mode': 'rule_based_demo',
               'category': kind, 'company_id': str(cid),
               'counts': {'assets': len(assets), 'collectors': len(collectors), 'logs': len(logs)}}
-    if not gemini_support.configured():
+    if not is_demo or not gemini_support.configured():
         return result
-    company = db.get(Company, cid)
     context = {'data_kind': 'verified_static_demo_telemetry', 'question': question_topics(message),
         'recent_topics': [question_topics(item.get('content', '')) for item in (history or [])[-gemini_support.MAX_HISTORY:]
                           if item.get('role') == 'customer'],
         'mock_telemetry': verified_demo(company.name, assets, collectors, logs)}
-    advice = gemini_support.guidance(context)
+    advice = gemini_support.guidance(context, user_id=user.id)
     if advice:
         result.update(mode='gemini_demo', answer='ข้อมูลจากระบบ demo (ไม่ใช่หลักฐานระบบจริง):\n' + answer
                       + '\n\nคำแนะนำทั่วไปจาก Gemini (ไม่ใช่ผลตรวจระบบ):\n' + advice)

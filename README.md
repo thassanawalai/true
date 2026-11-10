@@ -1,5 +1,36 @@
 # Internal AI Support Assistant System Documentation
 
+## SOC ITSM Demo — Gemini Developer API
+
+คู่มือส่วนนี้ใช้กับ Customer Portal, SOC Portal และ Ticket ใน feature branch ปัจจุบัน ส่วนถัดไปเป็นเอกสารของต้นแบบก่อนหน้า
+
+1. สร้างฐานข้อมูลสำหรับเดโมโดยเฉพาะ ตั้งค่า `DATABASE_URL` และ `DEMO_SESSION_SECRET` (สุ่มอย่างน้อย 32 ตัวอักษร) ใน environment ของ Backend หรือ `backend/.env` ซึ่ง Git จะข้าม
+2. จาก `backend/` ติดตั้ง dependencies ด้วย `python -m pip install -r requirements.txt` และรัน `PYTHONPATH=. python scripts/seed_phase1.py` กับ `PYTHONPATH=. python scripts/seed_customer_data.py` บนฐานข้อมูลเดโม สำหรับฐานที่จัดการด้วย Alembic ให้ใช้ `python -m alembic upgrade head` ก่อนเริ่มแอป ส่วนการเริ่มเดโมด้วย `create_all` จะเพิ่มตาราง assessment ใหม่โดยอัตโนมัติ
+3. เริ่ม Backend ด้วย `python -m uvicorn main:app --host 127.0.0.1 --port 8000` และเริ่ม Frontend จาก `frontend/` ด้วย `npm ci` แล้ว `npm run dev` เริ่มด้วย `GEMINI_ENABLED=false` เพื่อใช้ fallback และตรวจ flow โดยไม่เรียก Google
+4. หลังได้รับอนุญาตให้ใช้ Gemini API จริง ตั้งค่าด้านล่างใน Backend แล้ว restart ใช้เฉพาะบัญชีและข้อความจำลอง เก็บค่าจริงใน environment ของ Backend เท่านั้น
+
+```dotenv
+GEMINI_ENABLED=true
+GEMINI_API_KEY=<API key from Google AI Studio>
+GEMINI_MODEL=<model available to the key with generateContent and structured output>
+DEMO_AUTH_MODE=password
+DEMO_LOGIN_PASSWORDS_JSON={"customer.a1@example.test":"<unique random password>","customer.b1@example.test":"<another unique random password>","support@example.test":"<another unique random password>"}
+```
+
+กำหนดรหัสผ่านแบบสุ่มแยกตามอีเมลของบัญชีที่จะใช้ ความยาว 16–256 ตัวอักษร เมื่อเปิด Gemini ระบบบังคับใช้ password login และยกเลิกการใช้ token ที่ออกจาก mock login โหมดรหัสผ่านนี้มีไว้สำหรับเดโม ตัวจำกัดคำขออยู่ในหน่วยความจำของ Backend และใช้ร่วมกันระหว่าง Ticket และ Chat ให้รัน Uvicorn หนึ่ง worker สำหรับเดโม ค่าเริ่มต้นคือ 12 ครั้งต่อนาทีต่อผู้ใช้, 60 ครั้งต่อนาทีทั้งแอป และ 250 ครั้งต่อรอบ 24 ชั่วโมงต่อ process
+
+### ตรวจผลเดโม
+
+- เปิด Ticket ด้วยเหตุการณ์จำลองภาษาไทยหรืออังกฤษ แล้วเปิด Ticket Detail เพื่อดู Incident Type, Impact, Urgency, เหตุผล, คำแนะนำ และแหล่งประเมิน ระบบใช้ Priority Policy `soc-severity-v1` เลือกระดับที่รุนแรงกว่าระหว่างสองแกนและผูกกับ SLA Policy ของระดับนั้น
+- ถาม `What is the dashboard port in the knowledge base?` ใน Chat ของ A1 และ B1 ตรวจว่า Sources เป็น `KB-002` และ `KB-004` ตามลำดับ บัญชี SOC ต้องเลือกบริษัทก่อนถาม
+- เมื่อ Gemini ใช้ไม่ได้ Ticket ใหม่แสดง `Fallback — SOC review required` พร้อมค่าเริ่มต้น P3 ส่วน Chat แสดงข้อความจากเอกสารที่เข้าถึงได้หรือคำตอบจากข้อมูลจำลองตามประเภทคำถาม
+- หากต้องการใช้ Chroma ให้ใช้ index ที่มีเฉพาะ playbook จำลองที่อนุมัติแล้ว เตรียม embedding model ไว้ในเครื่องก่อน รัน `python scripts/ingest_playbooks.py --scope public` สำหรับเอกสารส่วนกลาง หรือแทน `public` ด้วย UUID ของบริษัทจำลอง จากนั้นตั้ง `DEMO_KB_CHROMA_ENABLED=true` เอกสารส่วนตัวเดิมที่ใช้ชื่อบริษัทเป็น metadata ต้อง ingest ใหม่ด้วย UUID
+
+รันชุดทดสอบ Gemini แบบไม่ออกเครือข่ายจาก `backend/` ด้วย `DATABASE_URL=sqlite:// GEMINI_ENABLED=false python -m unittest discover -s tests -p 'test_gemini*.py' -v` สำหรับชุดเต็มให้ใช้ Backend บนพอร์ต 8000 กับฐานข้อมูลเดโมแยกที่ seed แล้ว และรัน `python -m unittest discover -s tests -v`
+
+---
+
+
 เอกสารสรุประบบและสถาปัตยกรรมของ Internal AI Support Assistant ซึ่งเป็น API หลังบ้านที่พัฒนาขึ้นด้วยกรอบการทำงาน FastAPI ทำงานประสานกับLLM Google Gemini 3.6 Flash ระบบนี้ถูกออกแบบมาเพื่อช่วยแบ่งเบาภาระงานของทีมสนับสนุนลูกค้า โดยเน้นความปลอดภัยของข้อมูลองค์กรเป็นหลัก
 
 ## 1. ภาพรวมระบบและสถาปัตยกรรมหลัก (Core Architecture)

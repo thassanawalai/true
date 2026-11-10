@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from core.dependencies import get_db
 from core.demo_auth import current_user, internal, visible_ticket
@@ -12,8 +12,8 @@ from routers.customer_data import authorized_company
 
 router = APIRouter(prefix="/api/tickets", tags=["Tickets"])
 class TicketInput(BaseModel):
-    subject: str
-    description: str
+    subject: str = Field(max_length=200)
+    description: str = Field(max_length=5000)
 class AssignTicketRequest(BaseModel):
     assignee_id: UUID | None = None
 
