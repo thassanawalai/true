@@ -1,5 +1,6 @@
 """Opt-in AI Studio provider. No tools, IAM, raw transcripts or runtime discovery."""
 import json
+import logging
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor
@@ -8,6 +9,8 @@ from threading import BoundedSemaphore
 from pydantic import ValidationError
 
 from core.rate_limits import FixedWindow, positive_setting
+
+logger = logging.getLogger(__name__)
 
 HTTP_TIMEOUT_MS = 15000
 SERVER_DEADLINE_SECONDS = 12
@@ -100,7 +103,13 @@ def _generate(payload, system=SYSTEM, schema=None):
                 max_output_tokens=MAX_OUTPUT_TOKENS,
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True), **options))
         # Keep safety refusals and truncated/ambiguous responses on fallback.
-        if len(response.candidates or []) != 1 or str(response.candidates[0].finish_reason).split('.')[-1] != 'STOP':
+        if len(response.candidates or []) != 1:
+            logger.warning('Gemini response rejected: unexpected candidate count')
+            return None
+        finish = str(response.candidates[0].finish_reason).split('.')[-1]
+        if finish != 'STOP':
+            label = finish if finish in {'MAX_TOKENS', 'SAFETY', 'RECITATION', 'BLOCKLIST', 'PROHIBITED_CONTENT'} else 'OTHER'
+            logger.warning('Gemini response rejected: finish=%s', label)
             return None
         parts = getattr(getattr(response.candidates[0], 'content', None), 'parts', None) or []
         if any(getattr(part, 'function_call', None) for part in parts):
@@ -113,6 +122,7 @@ def _generate(payload, system=SYSTEM, schema=None):
         try:
             parsed = schema.model_validate_json(output)
         except ValidationError:
+            logger.warning('Gemini response rejected: structured output failed validation')
             return None
         return parsed if safe_input(str(parsed.model_dump())) else None
     finally:
@@ -148,9 +158,16 @@ def request(context, *, user_id, system=SYSTEM, schema=None):
     try:
         answer = future.result(timeout=DEADLINE_SECONDS)
         return (answer, None) if answer is not None else (None, 'invalid_response')
-    except Exception:
-        # Includes invalid key (400/401/403), unavailable model, quota (429),
-        # transport timeouts, missing SDK, blocked/malformed output. No retries.
+    except TimeoutError:
+        logger.warning('Gemini provider call timed out')
+        return None, 'provider_unavailable'
+    except Exception as exc:
+        # Never log exception text, response bodies, request content or credentials.
+        status = getattr(exc, 'code', None)
+        if type(status) is int and 400 <= status <= 599:
+            logger.warning('Gemini provider rejected request: HTTP %d', status)
+        else:
+            logger.warning('Gemini provider call failed without an HTTP error status')
         return None, 'provider_unavailable'
 
 
