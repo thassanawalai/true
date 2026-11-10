@@ -7,6 +7,7 @@ from core.dependencies import get_db
 from core.demo_auth import current_user, internal, visible_ticket
 from models.models import Ticket, User, RoleEnum, TicketCategory, TicketComment
 from schemas.ticket import TicketResponse, TicketStatusUpdate, TicketDetailResponse
+from services.incident_assessment import POLICY, priority_components, priority_for
 from services.ticket_service import create_ticket_from_ai
 from routers.customer_data import authorized_company
 
@@ -40,8 +41,14 @@ def get_ticket(ticket_id: UUID, db: Session = Depends(get_db), user: User = Depe
     if not internal(user):
         comments = comments.filter(TicketComment.is_internal.is_(False))
     category = db.get(TicketCategory, ticket.category_id)
+    calculation = None
+    if (ticket.assessment and ticket.assessment.priority_policy == POLICY
+            and priority_for(ticket.impact, ticket.urgency) == ticket.priority):
+        impact_priority, urgency_priority = priority_components(ticket.impact, ticket.urgency)
+        calculation = {'impact_priority': impact_priority, 'urgency_priority': urgency_priority}
     return {
         **TicketResponse.model_validate(ticket).model_dump(),
+        'priority_calculation': calculation,
         'company_name': ticket.company.name if ticket.company else None,
         'requester_id': ticket.requester_id,
         'requester_name': ticket.requester.full_name if ticket.requester else None,

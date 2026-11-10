@@ -31,11 +31,15 @@ widespread or business-critical disruption, SIGNIFICANT for major or multiple af
 systems, MODERATE for limited impact or unclear scope, MINOR for isolated low impact.
 Urgency is time sensitivity: CRITICAL for active severe harm requiring immediate action,
 HIGH for time-sensitive investigation/containment, MEDIUM for routine investigation or
-unclear timing, LOW for informational or planned follow-up. Explain both ratings in one
-short reason and recommend one safe next step. Use the report's main language.
+unclear timing, LOW for informational or planned follow-up. In impact_reason, briefly
+cite who or what is affected and flag any unknown scope. In urgency_reason, briefly cite
+whether harm is ongoing or time-sensitive and flag any unknown timing. Explain each
+rating with one short sentence grounded in the report. Recommend one safe next step.
+Use the report's main language.
 Return only the requested fields. The server calculates Priority."""
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=420)]
+RatingReason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
 
 class IncidentAnalysis(BaseModel):
@@ -47,13 +51,23 @@ class IncidentAnalysis(BaseModel):
     ]
     impact: ImpactEnum
     urgency: UrgencyEnum
-    reason: ShortText
+    impact_reason: RatingReason
+    urgency_reason: RatingReason
     recommendation: ShortText
+
+    @property
+    def reason(self) -> str:
+        # Keep the existing persisted reason field readable without a schema migration.
+        return f'Impact · {self.impact_reason}\nUrgency · {self.urgency_reason}'
+
+
+def priority_components(impact, urgency):
+    return IMPACT_PRIORITY[impact], URGENCY_PRIORITY[urgency]
 
 
 def priority_for(impact, urgency):
     """Higher severity of the two dimensions wins, matching the existing SLA policy."""
-    return min(IMPACT_PRIORITY[impact], URGENCY_PRIORITY[urgency], key=lambda value: value.value)
+    return min(priority_components(impact, urgency), key=lambda value: value.value)
 
 
 def assess(subject, description, user, company_name):
@@ -70,6 +84,7 @@ def assess(subject, description, user, company_name):
         return result, {'source': 'gemini', 'model': os.environ['GEMINI_MODEL'], 'priority_policy': POLICY}
     return IncidentAnalysis(
         incident_type='UNKNOWN', impact=ImpactEnum.MODERATE, urgency=UrgencyEnum.MEDIUM,
-        reason='Assessment unavailable. Default Impact and Urgency are provisional pending SOC review.',
+        impact_reason='ใช้ค่าชั่วคราว MODERATE รอ SOC ยืนยันขอบเขตผลกระทบ',
+        urgency_reason='ใช้ค่าชั่วคราว MEDIUM รอ SOC ยืนยันว่าเหตุการณ์ยังดำเนินอยู่หรือไม่',
         recommendation='Confirm affected systems, current activity and business impact with SOC.',
     ), {'source': 'fallback', 'fallback_reason': failure, 'priority_policy': POLICY}

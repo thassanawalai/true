@@ -58,6 +58,11 @@ class TicketCommentResponse(BaseModel):
     created_at: datetime
 
 
+class PriorityCalculation(BaseModel):
+    impact_priority: PriorityEnum
+    urgency_priority: PriorityEnum
+
+
 class TicketDetailResponse(TicketResponse):
     company_name: str | None
     requester_id: UUID
@@ -66,3 +71,4 @@ class TicketDetailResponse(TicketResponse):
     category_name: str | None
     updated_at: datetime | None
     comments: list[TicketCommentResponse]
+    priority_calculation: PriorityCalculation | None = None

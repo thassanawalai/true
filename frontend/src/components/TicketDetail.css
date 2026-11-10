@@ -15,6 +15,8 @@
 .ticket-metadata { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; padding:18px; background:#172033; border-radius:12px; }
 .ticket-metadata dt { color:#94a3b8; font-size:11px; margin-bottom:5px; }
 .ticket-metadata dd { font-size:13px; overflow-wrap:anywhere; }
+.ticket-assessment-explanation { grid-column:1 / -1; }
+.ticket-assessment-explanation dd { white-space:pre-line; line-height:1.7; }
 .ticket-detail h3 { font-size:14px; font-weight:650; margin-bottom:12px; }
 .ticket-description,.ticket-timeline p { white-space:pre-wrap; overflow-wrap:anywhere; font-size:14px; line-height:1.8; }
 .ticket-description { padding:16px; border:1px solid #334155; border-radius:12px; }

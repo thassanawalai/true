@@ -66,9 +66,15 @@ export default function TicketDetail({ ticketId, user, onClose, onChanged }) {
               ? `Gemini (${ticket.assessment.model})`
               : ticket.assessment.source === 'fallback' ? 'Fallback · รอ SOC ตรวจทาน' : 'Manual override'}</dd></div>
             <div><dt>ประเภทเหตุการณ์</dt><dd>{ticket.assessment.incident_type}</dd></div>
-            <div><dt>เหตุผล</dt><dd>{ticket.assessment.reason}</dd></div>
+            <div className="ticket-assessment-explanation"><dt>เหตุผลการประเมิน Impact และ Urgency</dt><dd>{ticket.assessment.reason}</dd></div>
             <div><dt>คำแนะนำ</dt><dd>{ticket.assessment.recommendation}</dd></div>
             <div><dt>Priority Policy</dt><dd>{ticket.assessment.priority_policy}</dd></div>
+            {ticket.priority_calculation && <div className="ticket-assessment-explanation">
+              <dt>วิธีคำนวณ Priority</dt>
+              <dd>Impact {ticket.impact} → {ticket.priority_calculation.impact_priority}{'\n'}
+                Urgency {ticket.urgency} → {ticket.priority_calculation.urgency_priority}{'\n'}
+                เลือกระดับที่รุนแรงกว่า (P1 สูงสุด) → <strong>{ticket.priority}</strong></dd>
+            </div>}
           </dl> : <p>ยังไม่มีผลประเมินที่บันทึกไว้</p>}
         </section>
         {internal && <section className="ticket-actions" aria-label="Support actions">

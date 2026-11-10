@@ -331,7 +331,9 @@ class GeminiOffline(unittest.TestCase):
 
     def incident(self, **overrides):
         data = {'incident_type': 'SERVICE_DISRUPTION', 'impact': 'EXTENSIVE', 'urgency': 'HIGH',
-                'reason': 'ระบบหลักหยุดทำงานหลายไซต์', 'recommendation': 'ตรวจสอบผลกระทบกับ SOC'}
+                'impact_reason': 'ระบบหลักหยุดทำงานหลายไซต์',
+                'urgency_reason': 'บริการยังขัดข้องและต้องเร่งตรวจสอบ',
+                'recommendation': 'ตรวจสอบผลกระทบกับ SOC'}
         self.structured(**(data | overrides))
 
     def ticket(self, description='ระบบหลักหยุดทำงานหลายไซต์ ขณะนี้ผู้ใช้ทั้งหมดเข้าไม่ได้', name='a1'):
@@ -345,11 +347,14 @@ class GeminiOffline(unittest.TestCase):
         self.assertEqual((ticket['impact'], ticket['urgency'], ticket['priority']), ('EXTENSIVE', 'HIGH', 'P1'))
         self.assertEqual(ticket['assessment']['source'], 'gemini')
         self.assertEqual(ticket['assessment']['priority_policy'], 'soc-severity-v1')
-        self.assertIn('หลายไซต์', ticket['assessment']['reason'])
+        self.assertEqual(ticket['assessment']['reason'],
+                         'Impact · ระบบหลักหยุดทำงานหลายไซต์\nUrgency · บริการยังขัดข้องและต้องเร่งตรวจสอบ')
         call = self.sdk.models.generate_content.call_args.kwargs
         self.assertEqual(json.loads(call['contents'])['description'], ticket['description'])
         self.assertNotIn('priority', call['config'].response_json_schema['properties'])
-        self.assertEqual(self.req('/api/tickets/' + ticket['id'], 'a2').json()['assessment'], ticket['assessment'])
+        detail = self.req('/api/tickets/' + ticket['id'], 'a2').json()
+        self.assertEqual(detail['assessment'], ticket['assessment'])
+        self.assertEqual(detail['priority_calculation'], {'impact_priority': 'P1', 'urgency_priority': 'P2'})
         self.assertEqual(self.req('/api/tickets/' + ticket['id'], 'b1').status_code, 404)
         self.assertEqual(self.req('/api/tickets/' + ticket['id'], 'support').status_code, 200)
         with self.Session() as db:
@@ -358,7 +363,8 @@ class GeminiOffline(unittest.TestCase):
 
     def test_english_negated_keyword_uses_model_ratings_and_checks_entire_policy(self):
         self.incident(incident_type='UNKNOWN', impact='MINOR', urgency='LOW',
-                      reason='No ransomware found. This is a completed training exercise.',
+                      impact_reason='No ransomware or affected systems were found.',
+                      urgency_reason='The training exercise has already ended.',
                       recommendation='Record the exercise outcome.')
         response = self.ticket('No ransomware found. The exercise ended yesterday.')
         self.assertEqual(response.json()['priority'], 'P4', response.text)
@@ -374,12 +380,31 @@ class GeminiOffline(unittest.TestCase):
         self.assertEqual(invalid['priority'], 'P3')
         self.assertEqual(invalid['assessment']['source'], 'fallback')
         self.assertEqual(invalid['assessment']['fallback_reason'], 'invalid_response')
+        detail = self.req('/api/tickets/' + invalid['id']).json()
+        self.assertEqual(detail['priority_calculation'], {'impact_priority': 'P3', 'urgency_priority': 'P3'})
         self.sdk.reset_mock()
         with patch.dict(os.environ, {'GEMINI_ENABLED': 'false'}):
             self.assertEqual(self.ticket().json()['assessment']['fallback_reason'], 'provider_disabled')
         self.assertEqual(self.ticket('Synthetic report password=private-value').json()['assessment']['fallback_reason'], 'input_guard')
         self.assertEqual(self.ticket(name=None).status_code, 401)
         self.sdk.models.generate_content.assert_not_called()
+
+    def test_ticket_detail_explains_urgency_winner_and_handles_historical_priority(self):
+        self.incident(impact='MODERATE', urgency='CRITICAL',
+                      impact_reason='ผลกระทบจำกัดอยู่ที่เครื่องเดียว',
+                      urgency_reason='ยังตรวจพบการเข้ารหัสไฟล์อย่างต่อเนื่อง')
+        ticket = self.ticket('มีเครื่องเดียวที่กำลังถูกเข้ารหัสไฟล์ต่อเนื่อง').json()
+        path = '/api/tickets/' + ticket['id']
+        detail = self.req(path).json()
+        self.assertEqual(detail['priority'], 'P1')
+        self.assertEqual(detail['priority_calculation'], {'impact_priority': 'P3', 'urgency_priority': 'P1'})
+        with self.Session() as db:
+            stored = db.query(Ticket).filter_by(ticket_number=ticket['ticket_number']).one()
+            stored.priority = PriorityEnum.P2
+            db.commit()
+        detail = self.req(path).json()
+        self.assertEqual(detail['priority'], 'P2')
+        self.assertIsNone(detail['priority_calculation'])
 
     def test_confirmed_chat_ticket_uses_only_explicit_report_and_is_idempotent(self):
         room_id = self.open_room()
