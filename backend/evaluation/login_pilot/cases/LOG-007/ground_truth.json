@@ -1,0 +1,9 @@
+{
+  "case_id": "LOG-007",
+  "dimensions": {
+    "facts": {
+      "source_ip_missing": true
+    }
+  },
+  "critical": {}
+}

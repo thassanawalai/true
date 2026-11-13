@@ -1,0 +1,9 @@
+{
+  "case_id": "LOG-010",
+  "dimensions": {
+    "interpretation": {
+      "conclusion": "order_undetermined"
+    }
+  },
+  "critical": {}
+}

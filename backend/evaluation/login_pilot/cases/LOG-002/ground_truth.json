@@ -1,0 +1,11 @@
+{
+  "case_id": "LOG-002",
+  "dimensions": {
+    "facts": {
+      "failed_count": 5,
+      "successful_count": 1,
+      "success_after_failure": true
+    }
+  },
+  "critical": {}
+}

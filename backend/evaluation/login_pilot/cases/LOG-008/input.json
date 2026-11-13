@@ -1,0 +1,13 @@
+{
+  "case_id": "LOG-008",
+  "question": "พบการล็อกอินสำเร็จและล้มเหลวอย่างละกี่ครั้ง?",
+  "logs": [
+    {
+      "event_id": "E01",
+      "timestamp": "2026-11-13T09:01:00+07:00",
+      "account": "a.user",
+      "source_ip": "192.0.2.10",
+      "status": "success"
+    }
+  ]
+}

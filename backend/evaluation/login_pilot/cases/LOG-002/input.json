@@ -1,0 +1,48 @@
+{
+  "case_id": "LOG-002",
+  "question": "ระบุจำนวนที่ล้มเหลวและสำเร็จ พร้อมบอกว่าสำเร็จเกิดหลังรายการล้มเหลวหรือไม่",
+  "logs": [
+    {
+      "event_id": "E01",
+      "timestamp": "2026-11-13T09:01:00+07:00",
+      "account": "a.user",
+      "source_ip": "192.0.2.10",
+      "status": "failure"
+    },
+    {
+      "event_id": "E02",
+      "timestamp": "2026-11-13T09:02:00+07:00",
+      "account": "a.user",
+      "source_ip": "192.0.2.10",
+      "status": "failure"
+    },
+    {
+      "event_id": "E03",
+      "timestamp": "2026-11-13T09:03:00+07:00",
+      "account": "a.user",
+      "source_ip": "192.0.2.10",
+      "status": "failure"
+    },
+    {
+      "event_id": "E04",
+      "timestamp": "2026-11-13T09:04:00+07:00",
+      "account": "a.user",
+      "source_ip": "192.0.2.10",
+      "status": "failure"
+    },
+    {
+      "event_id": "E05",
+      "timestamp": "2026-11-13T09:05:00+07:00",
+      "account": "a.user",
+      "source_ip": "192.0.2.10",
+      "status": "failure"
+    },
+    {
+      "event_id": "E06",
+      "timestamp": "2026-11-13T09:06:00+07:00",
+      "account": "a.user",
+      "source_ip": "192.0.2.10",
+      "status": "success"
+    }
+  ]
+}

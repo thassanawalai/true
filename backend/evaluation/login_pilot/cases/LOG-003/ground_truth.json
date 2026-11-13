@@ -1,0 +1,12 @@
+{
+  "case_id": "LOG-003",
+  "dimensions": {
+    "scope": {
+      "account": "a.user"
+    },
+    "facts": {
+      "failed_count": 5
+    }
+  },
+  "critical": {}
+}

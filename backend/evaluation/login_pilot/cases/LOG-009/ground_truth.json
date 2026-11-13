@@ -1,0 +1,10 @@
+{
+  "case_id": "LOG-009",
+  "dimensions": {
+    "next_steps": {
+      "check_success_history": true,
+      "check_mfa_results": true
+    }
+  },
+  "critical": {}
+}

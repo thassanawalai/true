@@ -1,0 +1,20 @@
+{
+  "case_id": "LOG-001",
+  "dimensions": {
+    "scope": {
+      "account": "a.user"
+    },
+    "facts": {
+      "failed_count": 5
+    },
+    "interpretation": {
+      "conclusion": "insufficient_evidence"
+    }
+  },
+  "critical": {
+    "conclusion": [
+      "confirmed_compromise",
+      "definitely_safe"
+    ]
+  }
+}

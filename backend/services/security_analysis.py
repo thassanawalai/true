@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, or_
 from models.customer_data import CustomerAsset, CustomerLog, LogCollector
-from services import knowledge_base
+from services import knowledge_base, login_summary
 
 RULES = (
     ('suspicious_login', ('suspicious login', 'suspicious_login', 'login', 'brute force', 'brute-force', 'เข้าสู่ระบบ', 'ล็อกอิน'),
@@ -66,8 +66,8 @@ def extract_entities(message):
     hosts = {h for h in re.findall(r'\b(?:[a-zA-Z0-9]+[-.])+[a-zA-Z0-9-]+\b', host_text)
              if '.' in h or any(c.isdigit() for c in h)}
     hosts.update(re.findall(r'(?i)\b(?:host(?:name)?|server)(?:\s*[:=]\s*|\s+)([\w.-]+)', host_text))
-    hosts = {h.casefold() for h in hosts if h not in ips and not re.fullmatch(r'[\d.-]+', h)}
-    users = re.findall(r'(?i)\b(?:user(?:name)?|account)(?:\s*[:=]\s*|\s+)([\w.@\\-]+)', message)
+    hosts = {h.casefold() for h in hosts if h not in login_summary.accounts(message) and h not in ips and not re.fullmatch(r'[\d.-]+', h)}
+    users = login_summary.accounts(message)
     stamps = re.findall(r'\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?)?\b', message)
     valid_stamps = []
     for value in stamps:
@@ -96,6 +96,8 @@ def analyze(message, db, cid):
     query = db.query(CustomerLog, CustomerAsset).join(CustomerAsset, CustomerLog.asset_id == CustomerAsset.id).join(
         LogCollector, CustomerLog.collector_id == LogCollector.id).filter(
             CustomerLog.company_id == cid, CustomerAsset.company_id == cid, LogCollector.company_id == cid)
+    if kind == 'suspicious_login':
+        events = (*events, *login_summary.SUCCESS)
     if events:
         query = query.filter(func.upper(CustomerLog.event_type).in_(events))
     else:
@@ -109,7 +111,11 @@ def analyze(message, db, cid):
     for username in entities['usernames']:
         query = query.filter(CustomerLog.message.contains(username, autoescape=True))
     missing = []
-    if entities['timestamps']:
+    window = login_summary.exact_window(message)
+    if window:
+        query = query.filter(CustomerLog.occurred_at >= window[0])
+        query = query.filter(CustomerLog.occurred_at <= window[1] if window[2] else CustomerLog.occurred_at < window[1])
+    elif entities['timestamps']:
         dates = [datetime.fromisoformat(s.replace('Z', '+00:00')) for s in entities['timestamps']]
         dates = [d.astimezone(timezone.utc).replace(tzinfo=None) if d.tzinfo else d for d in dates]
         start, end = min(dates), max(dates)
@@ -125,6 +131,7 @@ def analyze(message, db, cid):
     truncated = len(rows) > MAX_LOGS
     # Token validation avoids substring matches such as 192.0.2.1 vs .10.
     findings = []
+    selected_rows = []
     failed_by_account = Counter()
     for log, asset in rows[:MAX_LOGS]:
         log_entities = extract_entities(log.message)
@@ -133,6 +140,7 @@ def analyze(message, db, cid):
             continue
         if any(not re.search(r'(?<![\w.@-])' + re.escape(u) + r'(?![\w.@-])', log.message) for u in entities['usernames']):
             continue
+        selected_rows.append((log, asset))
         if kind == 'suspicious_login' and log.event_type.upper() in ('FAILED_LOGIN', 'LOGIN_FAILURE'):
             accounts = set(re.findall(
                 r'(?i)(?<![\w.-])(?:account|user(?:name)?)\s*[:=]\s*([\w.@\\-]+)',
@@ -143,6 +151,8 @@ def analyze(message, db, cid):
         findings.append({'log_id': str(log.id), 'asset_id': str(asset.id), 'hostname': asset.hostname,
                          'ip_address': asset.ip_address, 'event_type': log.event_type,
                          'occurred_at': log.occurred_at.isoformat(), 'message': log.message[:300]})
+    activity = login_summary.summarize(selected_rows, truncated) if kind == 'suspicious_login' else None
+    alert_findings = [f for f in findings if f['event_type'].upper() not in login_summary.SUCCESS]
     if not findings:
         missing.append('ไม่พบ log ที่สัมพันธ์กับรายงานในขอบเขตที่ค้นหา; การไม่มีข้อมูลไม่ยืนยันว่าระบบปลอดภัย')
     if not identifiers:
@@ -158,13 +168,13 @@ def analyze(message, db, cid):
         'suspicious_login': 'อาจเป็นการเดารหัสผ่านหรือผู้ใช้กรอกรหัสผิด; ยังยืนยัน account compromise ไม่ได้',
         'port_scan': 'อาจเป็น reconnaissance หรือการสแกนที่ได้รับอนุญาต; ยังยืนยันการเจาะระบบไม่ได้',
     }
-    risk = 'UNKNOWN' if not findings else ('HIGH' if kind in ('ransomware', 'data_exfiltration') else 'MEDIUM')
-    reasons = ['ไม่มีหลักฐานสัมพันธ์เพียงพอที่จะประเมินระดับความเสี่ยง'] if not findings else [
+    risk = 'UNKNOWN' if not alert_findings else ('HIGH' if kind in ('ransomware', 'data_exfiltration') else 'MEDIUM')
+    reasons = ['ไม่มีหลักฐานสัมพันธ์เพียงพอที่จะประเมินระดับความเสี่ยง'] if not alert_findings else [
         f'พบ {len(findings)} log ที่ตรงกับเงื่อนไขค้นหา แต่ event label ไม่ใช่ข้อยืนยันการบุกรุก',
         'ระดับนี้เป็นการคัดกรองเบื้องต้น; ยังไม่ทราบผลกระทบและความสำเร็จของการโจมตี']
     if risk == 'HIGH':
         reasons.append('ประเภท alert อาจกระทบความพร้อมใช้หรือความลับของข้อมูลอย่างรุนแรง จึงควรตรวจสอบเร่งด่วน')
-    return {'issue_type': kind, 'entities': entities, 'findings': findings,
+    return {'issue_type': kind, 'entities': entities, 'findings': findings, 'login_activity': activity,
             'failed_logins_by_account': [
                 {'account': account, 'count': count}
                 for account, count in sorted(failed_by_account.items(), key=lambda item: (item[0] is None, item[0] or ''))
@@ -182,15 +192,31 @@ def safe(value):
 
 
 def render_failed_logins(analysis):
-    rows = analysis.get('failed_logins_by_account', [])
-    if not rows:
+    activity = analysis.get('login_activity')
+    if not activity:
         return ''
     lines = [
-        f"- {('บัญชี ' + safe(row['account'])) if row['account'] else 'ไม่ทราบบัญชี'}"
-        f" ล็อกอินล้มเหลว {row['count']} ครั้ง"
-        for row in rows
+        f"ล็อกอินล้มเหลว {activity['failed_count']} ครั้ง และสำเร็จ {activity['successful_count']} ครั้ง",
+        f"รายการล้มเหลว {activity['failed_rows']} แถว",
     ]
-    return '\n\nล็อกอินล้มเหลวจาก Log ที่ตรวจพบ:\n' + '\n'.join(lines)
+    for row in activity['by_account']:
+        name = 'บัญชี ' + safe(row['account']) if row['account'] else 'ไม่ทราบบัญชี'
+        lines.append(f"- {name} ล็อกอินล้มเหลว {row['count']} ครั้ง")
+    for ip, count in activity['failures_by_ip'].items():
+        lines.append(f"- IP ต้นทาง {safe(ip)} ล้มเหลว {count} ครั้ง")
+    if activity['failed_unique'] is not None:
+        lines.append(f"เหตุการณ์ล้มเหลวไม่ซ้ำ {activity['failed_unique']} เหตุการณ์")
+    elif activity['failed_rows']:
+        lines.append('ข้อมูลรหัสเหตุการณ์ต้นทางไม่ครบ จึงยังนับเหตุการณ์ไม่ซ้ำไม่ได้')
+    if activity['missing_source_ip_rows']:
+        lines.append(f"ขาด IP ต้นทางที่อ่านได้ {activity['missing_source_ip_rows']} รายการ")
+    if activity['success_after_failure']:
+        lines.append('พบรายการสำเร็จหลังรายการล้มเหลวของบัญชีเดียวกันบนเครื่องเดียวกัน')
+    if activity['same_timestamp']:
+        lines.append('รายการที่มีเวลาเท่ากันยังยืนยันลำดับก่อนหลังไม่ได้')
+    if activity['truncated']:
+        lines.append('ยอดนี้เป็นจำนวนในรายการที่ตรวจได้ ผลค้นหาถูกจำกัด')
+    return '\n\nจาก Log ที่ตรวจพบ:\n' + '\n'.join(lines)
 
 
 def render(analysis, documents, advice=None):

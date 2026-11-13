@@ -1,0 +1,12 @@
+{
+  "case_id": "LOG-004",
+  "dimensions": {
+    "facts": {
+      "failures_by_ip": {
+        "192.0.2.10": 5,
+        "198.51.100.20": 1
+      }
+    }
+  },
+  "critical": {}
+}
