@@ -195,10 +195,16 @@ def render_failed_logins(analysis):
     activity = analysis.get('login_activity')
     if not activity:
         return ''
+    typed_count = activity['failed_count'] + activity['successful_count']
+    if not typed_count:
+        return ('\n\nยังระบุจำนวนครั้งที่ล็อกอินสำเร็จหรือล้มเหลวไม่ได้จากหลักฐานที่มี'
+                '\nต้องมีรายการผลการยืนยันตัวตนที่ระบุสถานะสำเร็จหรือล้มเหลวชัดเจน')
     lines = [
         f"ล็อกอินล้มเหลว {activity['failed_count']} ครั้ง และสำเร็จ {activity['successful_count']} ครั้ง",
         f"รายการล้มเหลว {activity['failed_rows']} แถว",
     ]
+    if len(analysis['findings']) > typed_count:
+        lines.append('ยอดนี้นับเฉพาะรายการที่ระบุผลการล็อกอินชัดเจน ส่วน Alert อื่นยังระบุจำนวนครั้งไม่ได้')
     for row in activity['by_account']:
         name = 'บัญชี ' + safe(row['account']) if row['account'] else 'ไม่ทราบบัญชี'
         lines.append(f"- {name} ล็อกอินล้มเหลว {row['count']} ครั้ง")
@@ -216,7 +222,7 @@ def render_failed_logins(analysis):
         lines.append('รายการที่มีเวลาเท่ากันยังยืนยันลำดับก่อนหลังไม่ได้')
     if activity['truncated']:
         lines.append('ยอดนี้เป็นจำนวนในรายการที่ตรวจได้ ผลค้นหาถูกจำกัด')
-    return '\n\nจาก Log ที่ตรวจพบ:\n' + '\n'.join(lines)
+    return '\n\nจาก Log ที่ตรวจพบ:\n\n' + '\n\n'.join(lines)
 
 
 def render(analysis, documents, advice=None):
