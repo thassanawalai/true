@@ -3,6 +3,7 @@
 No customer text, entities, timestamps or evidence from this module goes to AI.
 A log label is an observation, never proof of compromise or IP ownership.
 """
+from collections import Counter
 import ipaddress
 import re
 from datetime import datetime, timedelta, timezone
@@ -124,6 +125,7 @@ def analyze(message, db, cid):
     truncated = len(rows) > MAX_LOGS
     # Token validation avoids substring matches such as 192.0.2.1 vs .10.
     findings = []
+    failed_by_account = Counter()
     for log, asset in rows[:MAX_LOGS]:
         log_entities = extract_entities(log.message)
         if identifiers and not (asset.ip_address in entities['ip_addresses'] or asset.hostname.casefold() in entities['hostnames']
@@ -131,6 +133,13 @@ def analyze(message, db, cid):
             continue
         if any(not re.search(r'(?<![\w.@-])' + re.escape(u) + r'(?![\w.@-])', log.message) for u in entities['usernames']):
             continue
+        if kind == 'suspicious_login' and log.event_type.upper() in ('FAILED_LOGIN', 'LOGIN_FAILURE'):
+            accounts = set(re.findall(
+                r'(?i)(?<![\w.-])(?:account|user(?:name)?)\s*[:=]\s*([\w.@\\-]+)',
+                log.message,
+            ))
+            account = next(iter(accounts)) if len(accounts) == 1 else None
+            failed_by_account[account] += 1
         findings.append({'log_id': str(log.id), 'asset_id': str(asset.id), 'hostname': asset.hostname,
                          'ip_address': asset.ip_address, 'event_type': log.event_type,
                          'occurred_at': log.occurred_at.isoformat(), 'message': log.message[:300]})
@@ -156,6 +165,10 @@ def analyze(message, db, cid):
     if risk == 'HIGH':
         reasons.append('ประเภท alert อาจกระทบความพร้อมใช้หรือความลับของข้อมูลอย่างรุนแรง จึงควรตรวจสอบเร่งด่วน')
     return {'issue_type': kind, 'entities': entities, 'findings': findings,
+            'failed_logins_by_account': [
+                {'account': account, 'count': count}
+                for account, count in sorted(failed_by_account.items(), key=lambda item: (item[0] is None, item[0] or ''))
+            ],
             'assets': [{'id': str(a.id), 'hostname': a.hostname, 'ip_address': a.ip_address} for a in assets[:20]] if identifiers else [],
             'hypotheses': [hypotheses.get(kind, 'รายงานอาจเป็นภัยคุกคามหรือ false positive; ต้องตรวจสอบหลักฐานเพิ่มเติม')],
             'risk': {'level': risk, 'reasons': reasons}, 'recommendations': ACTIONS.get(kind, GENERIC_ACTIONS),
@@ -166,6 +179,18 @@ def analyze(message, db, cid):
 def safe(value):
     # Render untrusted record fields as inert Markdown text, never links/images.
     return re.sub(r'([\\`*{}\[\]()<>!#|])', r'\\\1', str(value).replace('\n', ' ').replace('\r', ' '))
+
+
+def render_failed_logins(analysis):
+    rows = analysis.get('failed_logins_by_account', [])
+    if not rows:
+        return ''
+    lines = [
+        f"- {('บัญชี ' + safe(row['account'])) if row['account'] else 'ไม่ทราบบัญชี'}"
+        f" ล็อกอินล้มเหลว {row['count']} ครั้ง"
+        for row in rows
+    ]
+    return '\n\nล็อกอินล้มเหลวจาก Log ที่ตรวจพบ:\n' + '\n'.join(lines)
 
 
 def render(analysis, documents, advice=None):
@@ -183,7 +208,7 @@ def render(analysis, documents, advice=None):
         actions += '\n\nคำแนะนำทั่วไปจาก Gemini (ไม่ใช่ผลตรวจระบบ):\n' + advice
     actions += '\n\n' + knowledge_base.render(documents)
     sections = [
-        ('Incident Summary', f"ประเภทปัญหา: {analysis['issue_type']}\nวิเคราะห์จากรายงานและข้อมูล tenant ที่ได้รับอนุญาต; ไม่ยืนยันการบุกรุกหรือเจ้าของ source IP"),
+        ('Incident Summary', f"ประเภทปัญหา: {analysis['issue_type']}\nวิเคราะห์จากรายงานและข้อมูล tenant ที่ได้รับอนุญาต; ไม่ยืนยันการบุกรุกหรือเจ้าของ source IP" + render_failed_logins(analysis)),
         ('Evidence & Findings', '\n'.join(evidence)),
         ('Risk Assessment', analysis['risk']['level'] + '\n' + '\n'.join('- ' + r for r in analysis['risk']['reasons'])),
         ('Recommended Actions', actions),
@@ -202,7 +227,7 @@ def render_brief(analysis, documents):
     summary = f"พบ {len(findings)} Log ที่ตรงกับเงื่อนไขค้นหา ยังไม่ยืนยันการบุกรุก"
     if analysis['truncated']:
         summary += ' (ผลค้นหาจำกัด 100 รายการ)'
-    return ('## สรุปการวิเคราะห์ Log\n' + summary + '\n\n'
+    return ('## สรุปการวิเคราะห์ Log\n' + summary + render_failed_logins(analysis) + '\n\n'
             + '**ความเสี่ยงเบื้องต้น:** ' + risk + ' (' + analysis['risk']['level'] + ')\n\n'
             + '**หลักฐานที่พบในระบบ:**\n' + '\n'.join(evidence) + '\n\n'
             + '**ข้อสันนิษฐาน — ยังไม่ยืนยัน:** ' + analysis['hypotheses'][0] + '\n\n'
