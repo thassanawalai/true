@@ -185,7 +185,9 @@ def send_message(room_id: UUID, payload: MessageInput, db: Session = Depends(get
             room = saved if saved else temporary(room_id, user)
             label = ('รายละเอียด Log: ' if payload.details else 'วิเคราะห์ Log: ') if payload.action == 'analyze_log' else ''
             additions = [new_message('customer', user, label + content), new_message('assistant', None, answer['answer'])]
-            return append_messages(db, saved, room, additions)
+            result = append_messages(db, saved, room, additions)
+            result['evaluation'] = {key: answer[key] for key in ('mode', 'provider', 'analysis') if key in answer}
+            return result
     finally:
         with live.lock:
             live.answering.discard(room_id)

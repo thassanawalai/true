@@ -3,6 +3,9 @@ import json
 import logging
 import os
 import re
+from contextvars import ContextVar, copy_context
+from time import monotonic
+from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 from threading import BoundedSemaphore
 
@@ -23,6 +26,19 @@ _pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix='soc-gemini')
 _slots = BoundedSemaphore(2)
 _minute = FixedWindow(60)
 _day = FixedWindow(86400)
+_trace = ContextVar("gemini_trace", default=None)
+
+def record_usage(response):
+    trace = _trace.get()
+    usage = getattr(response, 'usage_metadata', None)
+    if trace is not None and usage is not None:
+        trace['tokens'] = {key: value for key in ('prompt_token_count', 'candidates_token_count', 'total_token_count')
+                           if type(value := getattr(usage, key, None)) is int}
+
+
+def last_trace():
+    return dict(_trace.get() or {})
+
 
 SYSTEM = """คุณเป็นผู้ช่วย SOC ให้คำแนะนำทั่วไปภาษาไทยแบบข้อความธรรมดาไม่เกิน 3 ข้อและคำถามต่อ 1 ข้อ
 ใช้เฉพาะ telemetry จำลองและ public_knowledge ที่ให้มา อย่าแต่งหลักฐานหรืออ้างว่าตรวจระบบจริง
@@ -102,6 +118,7 @@ def _generate(payload, system=SYSTEM, schema=None):
                 # Gemini 3.x: omit unsupported candidate count and deprecated sampling overrides.
                 max_output_tokens=MAX_OUTPUT_TOKENS,
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True), **options))
+        record_usage(response)
         # Keep safety refusals and truncated/ambiguous responses on fallback.
         if len(response.candidates or []) != 1:
             logger.warning('Gemini response rejected: unexpected candidate count')
@@ -133,22 +150,38 @@ def guidance(context, user_id=None):
     return request(context, user_id=user_id)[0]
 
 
-def request(context, *, user_id, system=SYSTEM, schema=None):
+def request(context, *, user_id, system=SYSTEM, schema=None, incident=False):
+    trace = {'request_id': str(uuid4()), 'model': configured_model(),
+             'attempted': False, 'succeeded': False, 'failure': None}
+    _trace.set(trace)
+    started = monotonic()
+    answer, failure = _request(context, user_id=user_id, system=system, schema=schema, incident=incident)
+    trace.update(succeeded=answer is not None, failure=failure,
+                 latency_ms=round((monotonic() - started) * 1000))
+    return answer, failure
+
+
+def _request(context, *, user_id, system=SYSTEM, schema=None, incident=False):
     if not configured():
         return None, 'provider_disabled'
     payload = json.dumps(context, ensure_ascii=False, separators=(',', ':'))
-    if len(payload) > MAX_CONTEXT_CHARS or not safe_input(payload):
+    if len(payload) > (20000 if incident else MAX_CONTEXT_CHARS):
+        return None, 'context_limit' if incident else 'input_guard'
+    if not safe_input(payload):
         return None, 'input_guard'
     if not _slots.acquire(blocking=False):
         return None, 'provider_busy'
     if not _minute.take(
-        ('global', positive_setting('GEMINI_GLOBAL_PER_MINUTE', 60)),
+        ('global', positive_setting('GEMINI_GLOBAL_PER_MINUTE', 10)),
         (('user', user_id), positive_setting('GEMINI_USER_PER_MINUTE', 12)),
     ) or not _day.take(('global', positive_setting('GEMINI_MAX_CALLS_PER_DAY', 250))):
         _slots.release()
         return None, 'usage_limit'
     try:
-        future = _pool.submit(_generate, payload, system, schema)
+        _trace.get()['attempted'] = True
+        context = copy_context()
+        future = (_pool.submit(context.run, _generate_incident, payload, schema) if incident
+                  else _pool.submit(context.run, _generate, payload, system, schema))
     except Exception:
         _slots.release()
         return None, 'provider_unavailable'
@@ -157,15 +190,21 @@ def request(context, *, user_id, system=SYSTEM, schema=None):
     future.add_done_callback(lambda _future: _slots.release())
     try:
         answer = future.result(timeout=DEADLINE_SECONDS)
+        if incident:
+            return answer
         return (answer, None) if answer is not None else (None, 'invalid_response')
     except TimeoutError:
         logger.warning('Gemini provider call timed out')
-        return None, 'provider_unavailable'
+        return None, 'provider_timeout'
     except Exception as exc:
         # Never log exception text, response bodies, request content or credentials.
         status = getattr(exc, 'code', None)
         if type(status) is int and 400 <= status <= 599:
             logger.warning('Gemini provider rejected request: HTTP %d', status)
+            _trace.get()['http_status'] = status
+            return None, {429: 'provider_rate_limited', 503: 'provider_unavailable',
+                          401: 'provider_auth_error', 403: 'provider_auth_error',
+                          404: 'provider_model_not_found'}.get(status, 'provider_error')
         else:
             logger.warning('Gemini provider call failed without an HTTP error status')
         return None, 'provider_unavailable'
@@ -198,6 +237,7 @@ def _generate_incident(payload, schema):
                 response_mime_type='application/json', response_json_schema=schema,
                 max_output_tokens=2048,
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)))
+        record_usage(response)
         candidates = response.candidates or []
         if len(candidates) != 1 or str(candidates[0].finish_reason).split('.')[-1] != 'STOP':
             return None, 'invalid_finish'
@@ -212,19 +252,5 @@ def _generate_incident(payload, schema):
 
 
 def incident_json(context, schema):
-    if not configured(): return None, 'provider_disabled'
-    payload = json.dumps(context, ensure_ascii=False, separators=(',', ':'))
-    if len(payload) > 20000: return None, 'context_limit'
-    if not _slots.acquire(blocking=False): return None, 'provider_busy'
-    try:
-        future = _pool.submit(_generate_incident, payload, schema)
-    except Exception:
-        _slots.release()
-        return None, 'provider_unavailable'
-    future.add_done_callback(lambda _future: _slots.release())
-    try:
-        return future.result(timeout=DEADLINE_SECONDS)
-    except TimeoutError:
-        return None, 'provider_timeout'
-    except Exception:
-        return None, 'provider_unavailable'
+    # Use the same guards and accounting as chat and ticket analysis.
+    return request(context, user_id='incident-experiment', schema=schema, incident=True)

@@ -60,6 +60,16 @@ def verified_demo(company_name, assets, collectors, logs):
 
 
 def answer_question(message, db, user, company_id=None, history=None, *, action="knowledge", details=False):
+    gemini_support._trace.set(None)
+    result = _answer_question(message, db, user, company_id, history, action=action, details=details)
+    trace = gemini_support.last_trace()
+    result['provider'] = trace or {'attempted': False, 'succeeded': False, 'failure': 'not_called'}
+    result['provider']['answer_accepted'] = result.get('mode') == 'gemini_demo'
+    result['provider']['fallback_used'] = result.get('mode') != 'gemini_demo'
+    return result
+
+
+def _answer_question(message, db, user, company_id=None, history=None, *, action="knowledge", details=False):
     cid = authorized_company(db, user, company_id)  # before any retrieval/provider
     if re.fullmatch(r'(?:สวัสดี(?:ครับ|ค่ะ|คะ)?|หวัดดี(?:ครับ|ค่ะ)?|hello|hi|hey)[\s!.]*', message.strip(), re.IGNORECASE):
         return {'answer': 'สวัสดีค่ะ มีเรื่องความปลอดภัยใดให้ช่วยแนะนำบ้างคะ? เช่น อีเมลน่าสงสัย การเข้าสู่ระบบ หรือการรับมือเหตุการณ์',
