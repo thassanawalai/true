@@ -16,6 +16,12 @@ import httpx
 from .cases import VERSION, cases, grade
 
 
+def should_stop(result):
+    """Continue rejected advice only when provider execution and factual checks succeeded."""
+    provider = result.get('response', {}).get('provider', {})
+    return not result.get('facts_passed') or not provider.get('succeeded') or bool(provider.get('failure'))
+
+
 class Ledger:
     def __init__(self,path,budget=250,interval=60):
         self.db=sqlite3.connect(path,timeout=30)
@@ -89,7 +95,7 @@ def main():
     ledger=Ledger(args.state,args.budget,args.interval)
     ledger.bind('url',args.url.rstrip('/'));ledger.bind('version',VERSION)
     stopped = ledger.db.execute("SELECT status,result FROM attempts").fetchall()
-    if not args.continue_after_review and any(status!='completed' or not all(json.loads(result).get(k) for k in ('facts_passed','gemini_passed')) for status,result in stopped):
+    if not args.continue_after_review and any(status!='completed' or should_stop(json.loads(result)) for status,result in stopped):
         p.error('Previous run stopped or has uncertain results. Review report before --continue-after-review.')
     ledger.bind('cases_sha256',hashlib.sha256(json.dumps(cases(),sort_keys=True).encode()).hexdigest())
     completed=0
@@ -121,8 +127,8 @@ def main():
                 ledger.finish(case['case_id'],'completed',result)
                 completed+=1
                 print(case['case_id'],'facts=',result['facts_passed'],'gemini=',result['gemini_passed'],flush=True)
-                # Fail closed: no retries on 429, auth errors, timeouts, missing telemetry or fallback.
-                if not result['gemini_passed'] or not result['facts_passed']: break
+                # Preserve fallback outcomes and continue when the provider completed successfully.
+                if should_stop(result): break
                 if completed>=args.limit: break
                 if completed%10==0:
                     for _ in range(30): time.sleep(10)

@@ -93,7 +93,7 @@ class RunnerFlow(unittest.TestCase):
                 text+=' '.join(f"บัญชี {r['account']} ล็อกอินล้มเหลว {r['count']} ครั้ง" for r in e['by_account'])
                 text+=' '.join(f'IP ต้นทาง {ip} ล้มเหลว {n} ครั้ง' for ip,n in e['failures_by_ip'].items())
                 return Response({'analysis':{'login_activity':e,'findings':[{'log_id':i} for i in case['expected_ids']]},'answer':text,
-                    'mode':'rule_based_demo' if self.fallback else 'gemini_demo','provider':{'succeeded':not self.fallback}})
+                    'mode':'rule_based_demo' if self.fallback else 'gemini_demo','provider':{'succeeded':True}})
         with tempfile.TemporaryDirectory() as directory:
             state=str(Path(directory)/'state.sqlite');report=str(Path(directory)/'results.json')
             argv=['runner','--url','https://example.test','--state',state,'--report',report,'--limit','2']
@@ -104,10 +104,10 @@ class RunnerFlow(unittest.TestCase):
                 self.assertEqual(Client.calls,['EVAL-001','EVAL-002','EVAL-003','EVAL-004'])
                 Client.fallback=True
                 runner.main()
-                self.assertEqual(len(Client.calls),5)
-                with self.assertRaises(SystemExit): runner.main()
+                self.assertEqual(len(Client.calls),6)
+
             saved=json.loads(Path(report).read_text())
-            self.assertEqual(saved['facts_passed'],5)
+            self.assertEqual(saved['facts_passed'],6)
             self.assertEqual(saved['gemini_passed'],4)
             self.assertNotIn('test-only-token',Path(report).read_text())
 
@@ -118,3 +118,11 @@ class GradingTest(unittest.TestCase):
         self.assertFalse(exact({'x':True},{'x':1}))
         self.assertFalse(exact([1,2],[1]))
         self.assertTrue(exact({'x':[1,False]},{'x':[1,False]}))
+
+class FallbackPolicy(unittest.TestCase):
+    def test_stop_conditions(self):
+        from evaluation.live100.runner import should_stop
+        self.assertFalse(should_stop({'facts_passed':True,'gemini_passed':False,'response':{'provider':{'succeeded':True,'failure':None}}}))
+        for provider in ({}, {'succeeded':False}, {'succeeded':False,'failure':'provider_rate_limited'}):
+            self.assertTrue(should_stop({'facts_passed':True,'response':{'provider':provider}}))
+        self.assertTrue(should_stop({'facts_passed':False,'response':{'provider':{'succeeded':True}}}))

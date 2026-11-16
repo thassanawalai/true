@@ -79,3 +79,6 @@ python -m unittest discover -s tests -p test_live100.py -v
 ```
 ชุดทดสอบใช้ FastAPI และ SQLite จริง แต่ mock SDK และปิด network
 จึงเป็นหลักฐานการทำงานของโค้ด ไม่ใช่ผล Render/Neon/Gemini จริง
+
+## การปรับพฤติกรรม fallback
+เมื่อข้อเท็จจริงผ่านและ provider.succeeded=true โดยไม่มี failure โปรแกรมจะเก็บ fallback แล้วทำเคสถัดไป รวมถึง resume ผลเดิมชนิดนี้ได้ทันที ส่วนข้อเท็จจริงผิด การเรียก provider ล้มเหลว หรือสถานะไม่แน่ชัดยังหยุดตามเดิม คะแนน gemini_passed ของเคส fallback ยังคงเป็น false
