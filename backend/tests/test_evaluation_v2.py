@@ -76,3 +76,20 @@ class EvaluationProductFixes(unittest.TestCase):
         self.assertEqual(raw['provider']['failure'],'provider_timeout')
         self.assertTrue(raw['provider']['fallback_used']);self.assertTrue(raw['answer'])
         self.assertNotIn('private timeout detail',json.dumps(raw))
+
+class JudgeRunnerTest(unittest.TestCase):
+    def test_bounded_mock_calibration_resume_and_no_credentials_in_results(self):
+        from evaluation.v2 import judge_runner as jr
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+        with tempfile.TemporaryDirectory() as d:
+            client=MagicMock()
+            first=jr.calibration()[0]['answer']
+            client.models.generate_content.return_value=SimpleNamespace(text=json.dumps({'incorrect':False,'reason':'supported','answer_span':first}),usage_metadata=None)
+            with patch.dict('os.environ',{'SOC_JUDGE_API_KEY':'never-save-me','SOC_JUDGE_MODEL':'offline-judge'}),patch.object(jr.genai,'Client',return_value=client),patch.object(jr.Store,'wait_seconds',return_value=0),patch('sys.argv',['judge','--output',d,'--limit','1']):
+                jr.main();jr.main()
+            self.assertEqual(client.models.generate_content.call_count,2)
+            report=json.loads((Path(d)/'calibration-results.json').read_text())
+            self.assertEqual(report['calibration_status'],'unvalidated_reference')
+            self.assertEqual(report['calls_reserved'],2)
+            self.assertNotIn('never-save-me',(Path(d)/'judge-responses.jsonl').read_text())

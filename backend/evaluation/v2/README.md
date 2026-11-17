@@ -19,7 +19,7 @@ It assesses the delivered answer including fallback. A successful Gemini HTTP ca
 ## Not yet completed
 
 - Authenticated Render/Neon/Gemini execution requires test account sessions. No credentials are bundled.
-- Judge inference/calibration and a trusted reference review have not run. `judge.py` prepares packets; it is not a live judge runner.
+- Judge inference/calibration and a trusted reference review have not run. `judge.py` prepares packets; `judge_runner.py` can run bounded calibration on synthetic answers only. Live-answer judge inference is not implemented.
 - Inventory exact-row oracle needs an independent frozen database snapshot. Basic inventory-format checks cannot prove exact completeness.
 - Browser E2E has not run. ASGI TestClient results are API results, not DOM verification.
 - A separate frozen acceptance set is still needed. Pilot cases used to fix bugs are development evidence.
@@ -82,3 +82,7 @@ This only produces evaluation packets and synthetic calibration references; it c
 `state.sqlite` is the durable live source of truth; `responses.jsonl`, `assertions.csv` and `report.json` are exports.
 Offline output has separate `responses.jsonl`, `faults.jsonl`, `legacy.jsonl`, frozen manifest and report.
 Never add regression test-method counts to scenario counts. Never combine injected failures with natural fallback frequency. Never infer production latency from mocked SDK latency. `pending` does not mean wrong or right, and is never a pass.
+
+## Optional synthetic judge calibration
+
+Use `python -m evaluation.v2.judge_runner --output ./evaluation-output/judge-calibration --limit 5` after securely configuring `SOC_JUDGE_API_KEY` and `SOC_JUDGE_MODEL` in the runtime. It only transmits authored synthetic answers and public KB excerpts; never live transcripts. Use the same directory to resume, with at most 40 total calibration answers and at most 50 requests per rolling day. A missing/uncertain result stays pending. It reports development/holdout confusion matrices, but never automatically certifies the judge because the reference labels have not been reviewed independently. Do not run it concurrently with application tests.
