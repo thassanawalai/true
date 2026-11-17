@@ -186,7 +186,9 @@ def send_message(room_id: UUID, payload: MessageInput, db: Session = Depends(get
             label = ('รายละเอียด Log: ' if payload.details else 'วิเคราะห์ Log: ') if payload.action == 'analyze_log' else ''
             additions = [new_message('customer', user, label + content), new_message('assistant', None, answer['answer'])]
             result = append_messages(db, saved, room, additions)
-            result['evaluation'] = {key: answer[key] for key in ('mode', 'provider', 'analysis') if key in answer}
+            result['evaluation'] = {key: answer[key] for key in
+                ('mode', 'provider', 'analysis', 'answer_origin', 'citations', 'retrieval',
+                 'kb_status', 'category', 'company_id', 'counts', 'source') if key in answer}
             return result
     finally:
         with live.lock:

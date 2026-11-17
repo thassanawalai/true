@@ -65,7 +65,15 @@ def answer_question(message, db, user, company_id=None, history=None, *, action=
     trace = gemini_support.last_trace()
     result['provider'] = trace or {'attempted': False, 'succeeded': False, 'failure': 'not_called'}
     result['provider']['answer_accepted'] = result.get('mode') == 'gemini_demo'
-    result['provider']['fallback_used'] = result.get('mode') != 'gemini_demo'
+    greeting = bool(re.fullmatch(r'(?:สวัสดี(?:ครับ|ค่ะ|คะ)?|หวัดดี(?:ครับ|ค่ะ)?|hello|hi|hey)[\s!.]*', message.strip(), re.IGNORECASE))
+    intentional_local = greeting or result.get('answer_origin') == 'local_inventory'
+    result['provider']['fallback_used'] = not intentional_local and result.get('mode') != 'gemini_demo'
+    result['answer_origin'] = result.get('answer_origin') or ('rule_greeting' if greeting else
+        'gemini' if result.get('mode') == 'gemini_demo' else
+        'kb_fallback' if result.get('category') == 'knowledge' else 'local_analysis_fallback')
+    result['provider']['rejection_reason'] = (
+        'answer_policy_rejected' if trace and trace.get('succeeded') and not result['provider']['answer_accepted'] else
+        (trace or {}).get('failure') if not intentional_local else None)
     return result
 
 
@@ -78,6 +86,23 @@ def _answer_question(message, db, user, company_id=None, history=None, *, action
                 'category': 'logs', 'company_id': str(cid),
                 'counts': {'assets': 0, 'collectors': 0, 'logs': 0}}
     documents = knowledge_base.retrieve(message, cid)
+    filtered_list = bool(re.search(r'(?:ขอ|แสดง|ดู)\s*รายการ\s*(?:log|เหตุการณ์)|\b(?:list|show)\s+logs?\s+\S', message, re.IGNORECASE))
+    if action == 'knowledge' and filtered_list:
+        analysis = security_analysis.analyze(message, db, cid)
+        findings = analysis['findings']
+        lines = ['รายการ Log ที่ตรงกับเงื่อนไขในบริษัทของคุณ:']
+        for item in findings:
+            lines.append('- ' + ' | '.join(security_analysis.safe(item[key]) for key in
+                ('occurred_at', 'event_type', 'hostname', 'message')))
+        if not findings:
+            lines.append('ไม่พบ Log ที่ตรงกับเงื่อนไข การไม่มีข้อมูลไม่ยืนยันว่าระบบปลอดภัย')
+        if analysis['truncated']:
+            lines.append('ผลค้นหาจำกัด 100 Log โปรดระบุช่วงเวลาหรือเครื่องให้แคบลง')
+        lines.append('เป็นรายการหลักฐานที่ค้นพบ ยังไม่ยืนยันการบุกรุก')
+        return {'answer': '\n'.join(lines), 'source': 'tenant_scoped_mock_data', 'mode': 'rule_based_demo',
+                'answer_origin': 'local_inventory', 'category': 'logs', 'company_id': str(cid),
+                'citations': [], 'analysis': analysis, 'retrieval': 'filtered_logs', 'kb_status': 'not_applicable',
+                'counts': {'logs': len(findings)}}
     inventory_only = bool(re.fullmatch(r'(?:show |list |recent )?(?:logs|events|assets|collectors)[?.! ]*',
                                        message.strip(), re.IGNORECASE))
     if action == 'knowledge' and not inventory_only:

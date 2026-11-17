@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import BoundedSemaphore
 
 from pydantic import ValidationError
+from httpx import TimeoutException
 
 from core.rate_limits import FixedWindow, positive_setting
 
@@ -118,6 +119,8 @@ def _generate(payload, system=SYSTEM, schema=None):
                 # Gemini 3.x: omit unsupported candidate count and deprecated sampling overrides.
                 max_output_tokens=MAX_OUTPUT_TOKENS,
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True), **options))
+        if _trace.get() is not None:
+            _trace.get()['transport_succeeded'] = True
         record_usage(response)
         # Keep safety refusals and truncated/ambiguous responses on fallback.
         if len(response.candidates or []) != 1:
@@ -193,7 +196,7 @@ def _request(context, *, user_id, system=SYSTEM, schema=None, incident=False):
         if incident:
             return answer
         return (answer, None) if answer is not None else (None, 'invalid_response')
-    except TimeoutError:
+    except (TimeoutError, TimeoutException):
         logger.warning('Gemini provider call timed out')
         return None, 'provider_timeout'
     except Exception as exc:

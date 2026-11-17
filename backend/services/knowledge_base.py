@@ -71,7 +71,10 @@ def retrieve(message, company_id, *, documents=None):
                (d.get('scope') == 'public' and d.get('company_id') is None)
                or (d.get('scope') == 'company' and d.get('company_id') == cid)]
     query = unicodedata.normalize('NFKC', message[:1000]).casefold()
-    scored = [(sum(2 if ' ' in tag else 1 for tag in set(d['tags']) if matches(query, tag)), d)
+    # Generic alert/event words must not outrank the explicitly named threat.
+    generic = {'alert', 'แจ้งเตือน', 'security event', 'เหตุการณ์', 'incident'}
+    scored = [(sum(.25 if tag.casefold() in generic else 2 if ' ' in tag else 1
+                   for tag in set(d['tags']) if matches(query, tag)), d)
               for d in allowed]
     ranked = sorted(((score, doc) for score, doc in scored if score), key=lambda item: (-item[0], item[1]['id']))
     # Copies prevent callers from mutating the cached catalog.
