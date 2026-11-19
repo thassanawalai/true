@@ -106,7 +106,10 @@ def _answer_question(message, db, user, company_id=None, history=None, *, action
     inventory_only = bool(re.fullmatch(r'(?:show |list |recent )?(?:logs|events|assets|collectors)[?.! ]*',
                                        message.strip(), re.IGNORECASE))
     if action == 'knowledge' and not inventory_only:
-        return knowledge_answer(message, cid, documents[:1], history, user.id)
+        user_id = user.id
+        # End the read-only transaction before waiting on the provider.
+        db.rollback()
+        return knowledge_answer(message, cid, documents[:1], history, user_id)
     analysis = security_analysis.analyze(message, db, cid) if action == 'analyze_log' else None
     assets = db.query(CustomerAsset).filter(CustomerAsset.company_id == cid).order_by(CustomerAsset.ip_address).limit(20).all()
     collectors = db.query(LogCollector).filter(LogCollector.company_id == cid).order_by(LogCollector.name).limit(10).all()
@@ -147,7 +150,9 @@ def _answer_question(message, db, user, company_id=None, history=None, *, action
                           if item.get('role') == 'customer'],
         'mock_telemetry': verified_demo(company.name, assets, collectors, logs),
         'public_knowledge': knowledge_base.public_context(documents)}
-    advice = gemini_support.guidance(context, user_id=user.id)
+    user_id = user.id
+    db.rollback()
+    advice = gemini_support.guidance(context, user_id=user_id)
     # Model suggestions select reviewed actions; model-authored facts and
     # identifiers are never rendered, including hallucinated tenant data.
     advice = safe_guidance(advice)
