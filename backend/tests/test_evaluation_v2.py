@@ -65,6 +65,8 @@ class EvaluationProductFixes(unittest.TestCase):
             self.assertEqual({x['log_id'] for x in raw['analysis']['findings']},set(c['expected_ids']))
             self.assertFalse(raw['provider']['attempted']);self.assertFalse(raw['provider']['fallback_used'])
             self.assertEqual(raw['answer_origin'],'local_inventory')
+            if c['expected']['by_account']:
+                self.assertFalse(any('ชื่อบัญชี' in item for item in raw['analysis']['missing_information']))
         self.sdk.models.generate_content.assert_not_called()
     def test_specific_threat_beats_generic_alert(self):
         from services.knowledge_base import retrieve

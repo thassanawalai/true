@@ -157,8 +157,12 @@ def analyze(message, db, cid):
         missing.append('ไม่พบ log ที่สัมพันธ์กับรายงานในขอบเขตที่ค้นหา; การไม่มีข้อมูลไม่ยืนยันว่าระบบปลอดภัย')
     if not identifiers:
         missing.append('เครื่องหรือ IP ที่เกี่ยวข้อง; ขณะนี้สัมพันธ์กันเพียงประเภทเหตุการณ์ ยังไม่ยืนยันว่าเป็นเหตุเดียวกัน')
-    if not entities['usernames'] and kind == 'suspicious_login':
-        missing.append('ชื่อบัญชี ผล MFA และมีการเข้าสู่ระบบสำเร็จหลังความล้มเหลวหรือไม่')
+    if kind == 'suspicious_login':
+        # A missing account filter does not mean the retrieved records lack accounts.
+        known_accounts = (activity or {}).get('by_account') or []
+        if not known_accounts or any(not row.get('account') for row in known_accounts):
+            missing.append('ชื่อบัญชีของรายการที่ยังระบุบัญชีไม่ได้')
+        missing.append('ผล MFA และหลักฐานยืนยันว่าการเข้าใช้ได้รับอนุญาต เพื่อประเมินการยึดบัญชี')
     if kind == 'port_scan':
         missing.append('ต้นทาง ปลายทาง พอร์ต จำนวนครั้ง และรายการ scanner ที่ได้รับอนุญาต')
     missing.append('ผลกระทบจริงและหลักฐานเพิ่มเติมเพื่อยืนยันหรือหักล้างการบุกรุก')
