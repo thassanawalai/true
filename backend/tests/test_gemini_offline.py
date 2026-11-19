@@ -99,6 +99,27 @@ class GeminiOffline(unittest.TestCase):
         self.assertEqual(result.status_code, 200)
         return result.json()['id']
 
+    def test_chat_releases_database_transaction_before_provider_call(self):
+        from services import support_answers
+
+        with self.Session() as db:
+            user = db.get(User, self.users['a1'])
+
+            def assert_released(*args, **kwargs):
+                self.assertFalse(db.in_transaction())
+                return None
+
+            with patch.object(support_answers, 'knowledge_answer',
+                              side_effect=lambda *args: assert_released() or
+                              {'answer': 'KB', 'mode': 'rule_based_demo'}):
+                support_answers.answer_question('phishing', db, user)
+            self.assertFalse(db.in_transaction())
+
+            with patch.object(provider, 'guidance', side_effect=assert_released) as guidance:
+                support_answers.answer_question('assets', db, user)
+            guidance.assert_called_once()
+            self.assertFalse(db.in_transaction())
+
     def test_success_thai_labels_output_limits_and_no_tools(self):
         response = self.ask('ช่วยดู asset และ login', action='analyze_log', details=True)
         self.assertEqual(response.status_code, 200)
