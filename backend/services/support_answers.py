@@ -203,7 +203,15 @@ def knowledge_answer(message, cid, documents, history, user_id):
             system=KB_SYSTEM, schema=GroundedAnswer,
         )
         ids = {item['id'] for item in approved}
-        if (model and model.answer.strip() and model.citations and set(model.citations) <= ids
+        prompt_question = message.casefold()
+        unsolicited_mfa = 'KB-002' in ids and any(term in prompt_question for term in (
+            'ไม่ได้ร้องขอ', 'ไม่ได้เริ่ม', 'ไม่ได้ขอ', 'unsolicited', 'unexpected',
+        ))
+        answer_text = model.answer if model else ''
+        mfa_complete = not unsolicited_mfa or all(point in answer_text for point in (
+            'นอกเหนือจากรหัสผ่าน', 'ปฏิเสธ', 'รายงาน',
+        ))
+        if (model and mfa_complete and model.answer.strip() and model.citations and set(model.citations) <= ids
                 and not re.search(r'https?://|\bKB-\d+|[<>\[\]]', model.answer, re.IGNORECASE)):
             cited = [doc for doc in documents if doc['id'] in model.citations]
             result.update(mode='gemini_demo', citations=knowledge_base.citations(cited),

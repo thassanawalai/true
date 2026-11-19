@@ -470,6 +470,21 @@ class GeminiOffline(unittest.TestCase):
         self.assertEqual(self.req('/api/demo-auth/login', None, {'user_id': user_id}).status_code, 429)
 
 
+    def test_unsolicited_mfa_uses_full_kb_if_gemini_omits_a_required_point(self):
+        question = 'MFA ช่วยป้องกันการเข้าสู่ระบบได้อย่างไร และควรทำอย่างไรถ้าได้รับแจ้งเตือน MFA ที่ไม่ได้ร้องขอ'
+        self.structured(answer='เพิ่มความปลอดภัย ปฏิเสธและรายงานคำขอที่ไม่ได้เริ่ม', citations=['KB-002'])
+        result = self.ask(question).json()
+        self.assertTrue(result['provider']['fallback_used'])
+        self.assertEqual(result['citations'][0]['id'], 'KB-002')
+        self.assertIn('นอกเหนือจากรหัสผ่าน', result['answer'])
+        self.assertIn('ปฏิเสธคำขอและรายงาน', result['answer'])
+
+        self.structured(answer='MFA เพิ่มขั้นตรวจสอบนอกเหนือจากรหัสผ่าน ให้ปฏิเสธและรายงานคำขอที่ไม่ได้เริ่ม',
+                        citations=['KB-002'])
+        result = self.ask(question).json()
+        self.assertEqual(result['mode'], 'gemini_demo')
+        self.assertFalse(result['provider']['fallback_used'])
+
     def test_render_kb_uses_gemini_with_verified_document_and_rejects_unknown_citation(self):
         from services import knowledge_base
         question = 'phishing ควรทำอย่างไร'
