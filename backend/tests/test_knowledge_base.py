@@ -105,6 +105,16 @@ class KnowledgeAPI(unittest.TestCase):
             result = self.ask('phishing', name='support', company_id=str(self.companies['B'])).json()
             self.assertIn('B_PRIVATE_CANARY', result['answer']); self.assertNotIn('A_PRIVATE_CANARY', json.dumps(result))
 
+    def test_unsolicited_mfa_uses_relevant_kb_when_provider_times_out(self):
+        self.sdk.models.generate_content.side_effect = TimeoutError()
+        result = self.ask(
+            'MFA ช่วยป้องกันการเข้าสู่ระบบได้อย่างไร และควรทำอย่างไรถ้าได้รับแจ้งเตือน MFA ที่ไม่ได้ร้องขอ'
+        ).json()
+        self.assertEqual(result['citations'][0]['id'], 'KB-002')
+        self.assertTrue(result['provider']['fallback_used'])
+        self.assertIn('เพิ่มขั้นตรวจสอบนอกเหนือจากรหัสผ่าน', result['answer'])
+        self.assertIn('ปฏิเสธคำขอและรายงาน', result['answer'])
+
     def test_disabled_and_failed_ai_have_thai_fallback_and_citations(self):
         with patch.dict(fixture.os.environ, {'GEMINI_ENABLED': 'false'}):
             result = self.ask('phishing').json()
