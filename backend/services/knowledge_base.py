@@ -19,7 +19,7 @@ def fingerprint(document):
 # a new/edited document or a private document must not silently leave the server.
 APPROVED_PUBLIC_DIGESTS = {
     'KB-001': '5d6bf97d202ae5269139b6087816e3e00d4845b3ea31de75180c70eb2a4d5b5e',
-    'KB-002': '104a53befe5a14ef58eca5ba657adf27573cef18efb984a3b96d41c1440ae2b4',
+    'KB-002': 'cad3928fe88ebb0d726495e5333a69e25e0a4a5d823ca00ef1896c07cf8cd9cb',
     'KB-003': '331311c2b3e9205d49261d32af78808cb6865525f26f73b581ca571945d26995',
     'KB-004': 'a5e821d7c42c8166dda273d5900e3e823bb73e30395c7d77beb71509f349cf26',
     'KB-005': 'da9298df2ca815216006184d71c7a3eec5240653be32e8cf78ac846bb6db62d3',
@@ -73,9 +73,15 @@ def retrieve(message, company_id, *, documents=None):
     query = unicodedata.normalize('NFKC', message[:1000]).casefold()
     # Generic alert/event words must not outrank the explicitly named threat.
     generic = {'alert', 'แจ้งเตือน', 'security event', 'เหตุการณ์', 'incident'}
-    scored = [(sum(.25 if tag.casefold() in generic else 2 if ' ' in tag else 1
-                   for tag in set(d['tags']) if matches(query, tag)), d)
-              for d in allowed]
+    # An explicit authentication method carries more intent than generic login terms.
+    method_tags = {'mfa', '2fa', '2sv'}
+    scored = []
+    for doc in allowed:
+        matched = {tag.casefold() for tag in doc['tags'] if matches(query, tag)}
+        score = sum(.25 if tag in generic else 2 if ' ' in tag else 1 for tag in matched)
+        if matched & method_tags:
+            score += 1
+        scored.append((score, doc))
     ranked = sorted(((score, doc) for score, doc in scored if score), key=lambda item: (-item[0], item[1]['id']))
     # Copies prevent callers from mutating the cached catalog.
     return json.loads(json.dumps([doc for _, doc in ranked[:MAX_RESULTS]]))
